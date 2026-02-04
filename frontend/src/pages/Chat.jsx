@@ -17,7 +17,7 @@ const MessageStatus = ({ status, isMyMessage }) => {
 function Chat({ userData, socket }) {
   const { roomId } = useParams();
   const navigate = useNavigate();
-  const isDirectMessage = roomId.includes("_");
+  const isDirectMessage = roomId.includes("_"); // ✅ CHECK IF PRIVATE CHAT
 
   const [currentMessage, setCurrentMessage] = useState("");
   const [messageList, setMessageList] = useState([]);
@@ -266,17 +266,19 @@ function Chat({ userData, socket }) {
     typingTimeoutRef.current = setTimeout(() => socket.emit("stop_typing", roomId), 2000);
   };
 
-  if (!userData) return <div className="h-[100dvh] w-full bg-[#0b0f19] flex items-center justify-center text-blue-400 font-bold animate-pulse">Loading Chat...</div>;
+  if (!userData) return <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center text-blue-400 font-bold animate-pulse">Loading Chat...</div>;
 
   return (
-    // ✅ GRID LAYOUT: Forces the input bar to the bottom cell
-    <div className="w-full h-[100dvh] bg-[#0b0f19] grid grid-cols-[1fr] md:grid-cols-[350px_1fr] overflow-hidden font-sans">
+    // ✅ SMART GRID FIX: 
+    // If it's a Private Chat (isDirectMessage), use 1 column (Full Width).
+    // If it's a Group Chat (!isDirectMessage), use 2 columns (Sidebar + Chat).
+    <div className={`w-full h-[100dvh] bg-[#0b0f19] grid grid-cols-1 ${!isDirectMessage ? 'md:grid-cols-[350px_1fr]' : ''} overflow-hidden font-sans`}>
       
       {/* 🔮 BACKGROUND */}
       <div className="fixed top-[-20%] left-[-10%] w-[600px] h-[600px] bg-violet-600 rounded-full mix-blend-screen filter blur-[150px] opacity-20 animate-blob pointer-events-none"></div>
       <div className="fixed bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-blue-600 rounded-full mix-blend-screen filter blur-[150px] opacity-20 animate-blob animation-delay-4000 pointer-events-none"></div>
 
-      {/* 🛑 SIDEBAR */}
+      {/* 🛑 SIDEBAR (Only for Group Chats) */}
       {!isDirectMessage && (
         <div className="hidden md:flex flex-col h-full bg-black/20 backdrop-blur-xl border-r border-white/5 z-20">
            <div className="p-6 border-b border-white/5 bg-white/5 backdrop-blur-md">
@@ -303,8 +305,8 @@ function Chat({ userData, socket }) {
         </div>
       )}
 
-      {/* 💬 MAIN CHAT AREA - GRID ROWS FOR HEADER / BODY / INPUT */}
-      <div className={`h-full flex flex-col relative z-10 ${!isDirectMessage ? 'col-span-1' : 'col-span-2 md:col-span-1'}`}>
+      {/* 💬 MAIN CHAT AREA (Fills Remaining Space) */}
+      <div className="h-full flex flex-col relative z-10 w-full">
         
         {/* HEADER */}
         <div className="h-16 bg-black/40 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-30 shadow-sm shrink-0">
@@ -324,7 +326,7 @@ function Chat({ userData, socket }) {
              </div>
         </div>
 
-        {/* MESSAGES - FLEX 1 TO FILL SPACE */}
+        {/* MESSAGES */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar bg-transparent">
             {messageList.map((msg, index) => {
               const isMyMessage = userData.realName === msg.author;
@@ -366,7 +368,7 @@ function Chat({ userData, socket }) {
             <div ref={bottomRef} />
         </div>
 
-        {/* 🛠️ INPUT AREA - GRID CELL (Prevents Floating) */}
+        {/* 🛠️ INPUT AREA */}
         <div className="w-full bg-black/60 backdrop-blur-2xl border-t border-white/10 p-3 shrink-0 z-30">
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*,video/*" onChange={selectFile} />
             
