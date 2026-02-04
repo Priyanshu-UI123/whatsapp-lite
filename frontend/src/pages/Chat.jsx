@@ -4,16 +4,14 @@ import EmojiPicker from "emoji-picker-react";
 import { db } from "../firebase";
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 
-// 🎵 SOUND EFFECT (Base64 for reliability)
+// 🎵 SOUND EFFECT
 const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3";
 
-// ✅ HELPER: FORMAT DATE FOR SEPARATORS
 const formatDate = (dateString) => {
   const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
   return new Date(dateString).toLocaleDateString(undefined, options);
 };
 
-// ✅ HELPER: DETECT LINKS IN TEXT
 const Linkify = ({ text }) => {
   const urlRegex = /(https?:\/\/[^\s]+)/g;
   return text.split(urlRegex).map((part, index) => {
@@ -24,7 +22,6 @@ const Linkify = ({ text }) => {
   });
 };
 
-// ✅ TICK COMPONENT
 const MessageStatus = ({ status, isMyMessage }) => {
   if (!isMyMessage) return null;
   if (status === "sent") return <span className="text-white/40 text-[10px] ml-1">✓</span>;
@@ -44,10 +41,8 @@ function Chat({ userData, socket }) {
   const [showEmoji, setShowEmoji] = useState(false);
   const [typingUser, setTypingUser] = useState("");
   
-  // 🆕 NEW STATES
-  const [replyTo, setReplyTo] = useState(null); // Stores the message being replied to
+  const [replyTo, setReplyTo] = useState(null);
   const notificationAudio = useRef(new Audio(NOTIFICATION_SOUND));
-
   const bottomRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
@@ -75,7 +70,6 @@ function Chat({ userData, socket }) {
       setMessageList((list) => {
         if (data.author !== userData.realName) {
             socket.emit("message_status_update", { room: roomId, messageId: data.id, status: "delivered" });
-            // 🔔 PLAY SOUND if not my message
             notificationAudio.current.play().catch(e => console.log("Audio play blocked", e));
         }
         const newList = [...list, data];
@@ -119,7 +113,7 @@ function Chat({ userData, socket }) {
   // 3. AUTO SCROLL
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messageList, typingUser, replyTo]); // Added replyTo so it scrolls when reply box opens
+  }, [messageList, typingUser, replyTo]);
 
   // 4. MARK READ
   useEffect(() => {
@@ -137,8 +131,6 @@ function Chat({ userData, socket }) {
     return () => window.removeEventListener("focus", markRead);
   }, [messageList, roomId, userData, socket]);
 
-
-  // HELPER: UPDATE RECENT CHATS
   const updateRecentChats = async (msgContent) => {
     if (!isDirectMessage) return;
     const ids = roomId.split("_");
@@ -174,7 +166,6 @@ function Chat({ userData, socket }) {
     } catch (err) { console.error("Error updating chat list:", err); }
   };
 
-
   const sendMessage = async () => {
     if (currentMessage.trim() !== "") {
       const msgId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -186,9 +177,9 @@ function Chat({ userData, socket }) {
         photo: userData.photoURL,
         message: currentMessage,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        fullDate: new Date().toISOString(), // Used for Date Separators
+        fullDate: new Date().toISOString(), 
         status: "sent",
-        replyTo: replyTo // ↩️ Attach Reply Data
+        replyTo: replyTo 
       };
       
       await socket.emit("send_message", messageData);
@@ -200,7 +191,7 @@ function Chat({ userData, socket }) {
           return newList;
       });
       setCurrentMessage("");
-      setReplyTo(null); // Clear reply after sending
+      setReplyTo(null);
       setShowEmoji(false);
       socket.emit("stop_typing", roomId);
     }
@@ -215,7 +206,6 @@ function Chat({ userData, socket }) {
 
   if (!userData) return <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center text-blue-400 font-bold animate-pulse">Loading Chat...</div>;
 
-  // Group messages by Date
   let lastDate = null;
 
   return (
@@ -277,11 +267,23 @@ function Chat({ userData, socket }) {
         <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-2 custom-scrollbar bg-transparent min-h-0">
             {messageList.map((msg, index) => {
               const isMyMessage = userData.realName === msg.author;
-              
+              const isSystem = msg.author === "System";
+
               // 📅 DATE SEPARATORS
               const msgDate = msg.fullDate ? new Date(msg.fullDate).toDateString() : null;
               const showDate = msgDate && msgDate !== lastDate;
               if (msgDate) lastDate = msgDate;
+
+              // 🛑 SYSTEM MESSAGE (NEW MINIMAL DESIGN)
+              if (isSystem) {
+                  return (
+                    <div key={index} className="flex justify-center my-2">
+                        <span className="text-gray-500 text-[10px] font-mono tracking-wider opacity-75">
+                           {msg.message}
+                        </span>
+                    </div>
+                  );
+              }
 
               return (
                 <div key={index}>
@@ -313,13 +315,11 @@ function Chat({ userData, socket }) {
 
                             {!isMyMessage && <p className="text-[10px] font-bold text-blue-400 mb-1.5 tracking-wide uppercase opacity-80">{msg.author}</p>}
                             
-                            {/* 🔗 LINKIFY TEXT */}
                             <p className="break-words leading-relaxed font-light tracking-wide">
                                 <Linkify text={msg.message} />
                             </p>
                             
                             <div className={`flex justify-between items-center mt-1.5 gap-2`}>
-                                {/* 📋 COPY BUTTON (Shows on Hover) */}
                                 <button onClick={() => navigator.clipboard.writeText(msg.message)} className="opacity-0 group-hover:opacity-100 text-[9px] text-gray-300 hover:text-white transition">COPY</button>
                                 
                                 <div className="flex items-center gap-1.5 opacity-60">
