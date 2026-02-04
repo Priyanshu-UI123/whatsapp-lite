@@ -3,18 +3,24 @@ import { useParams, useNavigate } from "react-router-dom";
 import EmojiPicker from "emoji-picker-react";
 import { storage } from "../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { v4 as uuidv4 } from 'uuid'; // Run: npm install uuid
+
+// ✅ TICK COMPONENT (The Visual Part)
+const MessageStatus = ({ status }) => {
+  if (status === "sent") return <span className="text-gray-400 text-[10px] ml-1">✓</span>;
+  if (status === "delivered") return <span className="text-gray-400 text-[10px] ml-1">✓✓</span>;
+  if (status === "read") return <span className="text-blue-500 text-[10px] ml-1">✓✓</span>;
+  return null; // For received messages (no ticks needed)
+};
 
 function Chat({ userData, socket }) {
   const { roomId } = useParams();
   const navigate = useNavigate();
-
-  // 🔍 CHECK: Is this a Direct Message (DM) or a Group?
-  // Our logic: DMs use "uid_uid", Groups use simple names like "general"
   const isDirectMessage = roomId.includes("_");
 
   const [currentMessage, setCurrentMessage] = useState("");
   const [messageList, setMessageList] = useState([]);
-  const [userList, setUserList] = useState([]); // Only used for Groups now
+  const [userList, setUserList] = useState([]);
   const [showEmoji, setShowEmoji] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [typingUser, setTypingUser] = useState("");
@@ -27,15 +33,11 @@ function Chat({ userData, socket }) {
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
-  // 1. JOIN ROOM & HANDLE RE-CONNECTION
+  // 1. JOIN ROOM & LOAD HISTORY
   useEffect(() => {
     if (userData && roomId) {
        const joinRoom = () => {
-          socket.emit("join_room", { 
-             room: roomId, 
-             username: userData.realName, 
-             photo: userData.photoURL 
-          });
+          socket.emit("join_room", { room: roomId, username: userData.realName, photo: userData.photoURL });
        };
        joinRoom();
        socket.on("connect", joinRoom);
@@ -49,26 +51,52 @@ function Chat({ userData, socket }) {
     }
   }, [roomId, userData, socket]);
 
-  // 2. SOCKET LISTENERS
+  // 2. SOCKET LISTENERS (The Brains)
   useEffect(() => {
     const handleReceiveMessage = (data) => {
       setMessageList((list) => {
+        // If I am receiving it, it is definitely DELIVERED to me.
+        // Send ACK back to sender
+        socket.emit("message_status_update", { room: roomId, messageId: data.id, status: "delivered" });
+        
+        // If I am looking at the screen right now, mark it READ too
+        if (document.visibilityState === 'visible') {
+             socket.emit("message_status_update", { room: roomId, messageId: data.id, status: "read" });
+        }
+
         const newList = [...list, data];
         localStorage.setItem(`chat_${roomId}`, JSON.stringify(newList)); 
         return newList;
       });
     };
+
+    // 🆕 HANDLE STATUS UPDATES (Grey -> Blue)
+    const handleStatusUpdate = (data) => {
+        setMessageList((list) => {
+            const newList = list.map((msg) => {
+                if (msg.id === data.messageId) {
+                    return { ...msg, status: data.status };
+                }
+                return msg;
+            });
+            localStorage.setItem(`chat_${roomId}`, JSON.stringify(newList));
+            return newList;
+        });
+    };
+
     const handleUserList = (users) => setUserList(users);
     const handleDisplayTyping = (user) => setTypingUser(user);
     const handleHideTyping = () => setTypingUser("");
 
     socket.on("receive_message", handleReceiveMessage);
+    socket.on("message_status_updated", handleStatusUpdate); // 👈 New Listener
     socket.on("update_user_list", handleUserList);
     socket.on("display_typing", handleDisplayTyping);
     socket.on("hide_typing", handleHideTyping);
 
     return () => {
       socket.off("receive_message", handleReceiveMessage);
+      socket.off("message_status_updated", handleStatusUpdate);
       socket.off("update_user_list", handleUserList);
       socket.off("display_typing", handleDisplayTyping);
       socket.off("hide_typing", handleHideTyping);
@@ -82,15 +110,20 @@ function Chat({ userData, socket }) {
 
   const sendMessage = async () => {
     if (currentMessage !== "") {
+      const msgId = Date.now().toString(); // Simple ID
       const messageData = {
+        id: msgId, // 👈 New ID field
         room: roomId,
         author: userData.realName,
         photo: userData.photoURL,
         type: "text",
         message: currentMessage,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        status: "sent" // 👈 Default status
       };
+      
       await socket.emit("send_message", messageData);
+      
       setMessageList((list) => {
           const newList = [...list, messageData];
           localStorage.setItem(`chat_${roomId}`, JSON.stringify(newList));
@@ -108,14 +141,17 @@ function Chat({ userData, socket }) {
         const fileRef = ref(storage, `chat_files/${Date.now()}_${file.name || "audio.webm"}`);
         await uploadBytes(fileRef, file);
         const url = await getDownloadURL(fileRef);
-        
+        const msgId = Date.now().toString();
+
         const messageData = {
+            id: msgId,
             room: roomId,
             author: userData.realName,
             photo: userData.photoURL,
             type: type,
             message: url,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            status: "sent"
         };
         await socket.emit("send_message", messageData);
         setMessageList((list) => {
@@ -169,7 +205,6 @@ function Chat({ userData, socket }) {
   return (
     <div className="flex w-full max-w-5xl h-[90vh] bg-[#0b141a] border border-gray-700 rounded-lg overflow-hidden shadow-2xl relative mx-auto mt-5">
       
-      {/* 🛑 SIDEBAR: ONLY SHOW IF NOT A DIRECT MESSAGE */}
       {!isDirectMessage && (
         <div className="w-1/3 bg-gray-800 border-r border-gray-700 hidden md:flex flex-col">
            <div className="p-4 bg-gray-750 border-b border-gray-700 flex justify-between items-center bg-[#202c33]">
@@ -191,26 +226,19 @@ function Chat({ userData, socket }) {
         </div>
       )}
 
-      {/* CHAT AREA */}
       <div className="flex-1 flex flex-col bg-[#0b141a] relative bg-[url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')] bg-repeat">
-        
-        {/* HEADER */}
         <div className="bg-[#202c33] p-4 flex items-center justify-between shadow-md z-10">
             <div className="flex items-center gap-3">
-                {/* Back Button for Mobile or DM */}
                 <button onClick={() => navigate("/")} className="text-gray-400 text-xl md:hidden">⬅</button>
-                
                 <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white font-bold">
                     {isDirectMessage ? "👤" : "#"}
                 </div>
                 <div>
-                    {/* Simplified Name for DM */}
                     <p className="font-bold text-gray-100">{isDirectMessage ? "Private Chat" : `Room: ${roomId}`}</p>
                     {typingUser && <p className="text-xs text-green-400 animate-pulse">{typingUser} typing...</p>}
                 </div>
             </div>
              <button onClick={() => { localStorage.removeItem(`chat_${roomId}`); setMessageList([]); }} className="text-gray-400 text-xs">Clear Chat</button>
-             {/* If it IS a DM on desktop, show Exit here since sidebar is gone */}
              {isDirectMessage && <button onClick={() => navigate("/")} className="text-red-400 text-xs ml-4 border border-red-500 p-1 rounded">Exit</button>}
         </div>
 
@@ -228,7 +256,11 @@ function Chat({ userData, socket }) {
                          msg.type === "audio" ? <audio src={msg.message} controls className="max-w-[200px] mt-1" /> :
                          <p className="break-words text-[15px] pb-2">{msg.message}</p>}
                         
-                        <p className={`text-[9px] absolute bottom-1 right-2 ${isMyMessage ? "text-green-200" : "text-gray-400"}`}>{msg.time}</p>
+                        {/* 🆕 TICK LOGIC */}
+                        <div className={`flex justify-end items-center mt-1 absolute bottom-1 right-2`}>
+                            <p className={`text-[9px] mr-1 ${isMyMessage ? "text-green-200" : "text-gray-400"}`}>{msg.time}</p>
+                            {isMyMessage && <MessageStatus status={msg.status} />}
+                        </div>
                     </div>
                 </div>
               );
