@@ -170,10 +170,10 @@ function App() {
   const selectFile = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 1000000) { 
-        alert("File too large! Keep it under 1MB.");
-        return;
-      }
+      if (file.size > 50 * 1024 * 1024) { 
+    alert("File too large! Max 50MB.");
+    return;
+}
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => {
