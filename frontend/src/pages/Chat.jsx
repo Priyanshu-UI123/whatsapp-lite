@@ -161,6 +161,9 @@ function Chat({ userData, socket }) {
     typingTimeoutRef.current = setTimeout(() => socket.emit("stop_typing", roomId), 2000);
   };
 
+  // 🛡️ SECURITY GUARD: If data isn't ready, wait (Prevents Refresh Crash)
+  if (!userData) return <div className="bg-[#0b141a] h-screen flex items-center justify-center text-white font-bold">Loading Chat...</div>;
+
   return (
     <div className="flex w-full max-w-5xl h-[90vh] bg-[#0b141a] border border-gray-700 rounded-lg overflow-hidden shadow-2xl relative mx-auto mt-5">
       {/* SIDEBAR */}
@@ -232,12 +235,11 @@ function Chat({ userData, socket }) {
             <input type="text" value={currentMessage} placeholder="Type a message..." className="flex-1 p-3 bg-[#2a3942] text-white rounded-lg outline-none focus:bg-[#2a3942]"
                 onChange={handleTyping} onKeyPress={(e) => { e.key === "Enter" && sendMessage(); }} />
             
-            {/* 🆕 MIC BUTTON LOGIC: Show Mic if empty text, Send if text exists */}
+            {/* 🆕 MIC BUTTON LOGIC */}
             {currentMessage.trim() === "" ? (
                <button 
                  onMouseDown={startRecording} 
                  onMouseUp={stopRecording} 
-                 // Touch events for mobile support
                  onTouchStart={startRecording}
                  onTouchEnd={stopRecording}
                  className={`p-3 rounded-full text-white transition ${isRecording ? "bg-red-600 scale-110" : "bg-[#00a884] hover:bg-[#008f6f]"}`}
