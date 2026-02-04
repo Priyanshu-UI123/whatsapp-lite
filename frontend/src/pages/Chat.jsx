@@ -24,12 +24,31 @@ function Chat({ userData, socket }) {
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
-  // 1. JOIN ROOM & LOAD HISTORY
+  // 1. JOIN ROOM & HANDLE RE-CONNECTION (Fixes "Empty User List" on Reload)
   useEffect(() => {
     if (userData && roomId) {
-       socket.emit("join_room", { room: roomId, username: userData.realName, photo: userData.photoURL });
+       // Function to join the room
+       const joinRoom = () => {
+          socket.emit("join_room", { 
+             room: roomId, 
+             username: userData.realName, 
+             photo: userData.photoURL 
+          });
+       };
+
+       // Join immediately on load
+       joinRoom();
+
+       // 🛡️ RE-JOIN IF DISCONNECTED (Crucial for unstable connections/reloads)
+       socket.on("connect", joinRoom);
+
+       // Load Chat History
        const savedMessages = localStorage.getItem(`chat_${roomId}`);
        if (savedMessages) setMessageList(JSON.parse(savedMessages));
+
+       return () => {
+          socket.off("connect", joinRoom);
+       };
     }
   }, [roomId, userData, socket]);
 
