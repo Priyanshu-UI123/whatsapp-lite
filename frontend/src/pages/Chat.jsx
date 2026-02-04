@@ -3,14 +3,14 @@ import { useParams, useNavigate } from "react-router-dom";
 import EmojiPicker from "emoji-picker-react";
 import { storage } from "../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { v4 as uuidv4 } from 'uuid'; // Run: npm install uuid
+import { v4 as uuidv4 } from 'uuid'; 
 
-// ✅ TICK COMPONENT (The Visual Part)
+// ✅ TICK COMPONENT
 const MessageStatus = ({ status }) => {
   if (status === "sent") return <span className="text-gray-400 text-[10px] ml-1">✓</span>;
   if (status === "delivered") return <span className="text-gray-400 text-[10px] ml-1">✓✓</span>;
   if (status === "read") return <span className="text-blue-500 text-[10px] ml-1">✓✓</span>;
-  return null; // For received messages (no ticks needed)
+  return null; 
 };
 
 function Chat({ userData, socket }) {
@@ -33,7 +33,7 @@ function Chat({ userData, socket }) {
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
-  // 1. JOIN ROOM & LOAD HISTORY
+  // 1. JOIN ROOM
   useEffect(() => {
     if (userData && roomId) {
        const joinRoom = () => {
@@ -51,26 +51,21 @@ function Chat({ userData, socket }) {
     }
   }, [roomId, userData, socket]);
 
-  // 2. SOCKET LISTENERS (The Brains)
+  // 2. SOCKET LISTENERS
   useEffect(() => {
     const handleReceiveMessage = (data) => {
       setMessageList((list) => {
-        // If I am receiving it, it is definitely DELIVERED to me.
-        // Send ACK back to sender
-        socket.emit("message_status_update", { room: roomId, messageId: data.id, status: "delivered" });
-        
-        // If I am looking at the screen right now, mark it READ too
-        if (document.visibilityState === 'visible') {
-             socket.emit("message_status_update", { room: roomId, messageId: data.id, status: "read" });
+        // Send Delivered Status immediately
+        if (data.author !== userData.realName) {
+            socket.emit("message_status_update", { room: roomId, messageId: data.id, status: "delivered" });
         }
-
+        
         const newList = [...list, data];
         localStorage.setItem(`chat_${roomId}`, JSON.stringify(newList)); 
         return newList;
       });
     };
 
-    // 🆕 HANDLE STATUS UPDATES (Grey -> Blue)
     const handleStatusUpdate = (data) => {
         setMessageList((list) => {
             const newList = list.map((msg) => {
@@ -89,7 +84,7 @@ function Chat({ userData, socket }) {
     const handleHideTyping = () => setTypingUser("");
 
     socket.on("receive_message", handleReceiveMessage);
-    socket.on("message_status_updated", handleStatusUpdate); // 👈 New Listener
+    socket.on("message_status_updated", handleStatusUpdate); 
     socket.on("update_user_list", handleUserList);
     socket.on("display_typing", handleDisplayTyping);
     socket.on("hide_typing", handleHideTyping);
@@ -101,25 +96,58 @@ function Chat({ userData, socket }) {
       socket.off("display_typing", handleDisplayTyping);
       socket.off("hide_typing", handleHideTyping);
     };
-  }, [socket, roomId]);
+  }, [socket, roomId, userData]);
 
   // 3. AUTO SCROLL
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messageList, typingUser, uploading, isRecording]);
 
+  // 🆕 4. INTELLIGENT "MARK AS READ" TRIGGER
+  // This runs whenever messageList changes OR when you focus the window
+  useEffect(() => {
+    const markRead = () => {
+        if (document.visibilityState === 'visible') {
+            messageList.forEach(msg => {
+                // If the message is NOT mine and NOT read yet, tell them I saw it!
+                if (msg.author !== userData.realName && msg.status !== "read") {
+                    socket.emit("message_status_update", { room: roomId, messageId: msg.id, status: "read" });
+                    
+                    // Optimistically update my local view too so I don't span the server
+                    // (Optional, but good for performance)
+                }
+            });
+        }
+    };
+
+    // Run immediately (in case I just opened the chat)
+    markRead();
+
+    // Run whenever I click back onto the tab
+    window.addEventListener("focus", markRead);
+    window.addEventListener("visibilitychange", markRead);
+
+    return () => {
+        window.removeEventListener("focus", markRead);
+        window.removeEventListener("visibilitychange", markRead);
+    };
+  }, [messageList, roomId, userData, socket]);
+
+
+  // --- MESSAGING FUNCTIONS ---
+
   const sendMessage = async () => {
     if (currentMessage !== "") {
-      const msgId = Date.now().toString(); // Simple ID
+      const msgId = uuidv4(); // Generate unique ID
       const messageData = {
-        id: msgId, // 👈 New ID field
+        id: msgId,
         room: roomId,
         author: userData.realName,
         photo: userData.photoURL,
         type: "text",
         message: currentMessage,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        status: "sent" // 👈 Default status
+        status: "sent" 
       };
       
       await socket.emit("send_message", messageData);
@@ -141,7 +169,7 @@ function Chat({ userData, socket }) {
         const fileRef = ref(storage, `chat_files/${Date.now()}_${file.name || "audio.webm"}`);
         await uploadBytes(fileRef, file);
         const url = await getDownloadURL(fileRef);
-        const msgId = Date.now().toString();
+        const msgId = uuidv4();
 
         const messageData = {
             id: msgId,
@@ -256,7 +284,6 @@ function Chat({ userData, socket }) {
                          msg.type === "audio" ? <audio src={msg.message} controls className="max-w-[200px] mt-1" /> :
                          <p className="break-words text-[15px] pb-2">{msg.message}</p>}
                         
-                        {/* 🆕 TICK LOGIC */}
                         <div className={`flex justify-end items-center mt-1 absolute bottom-1 right-2`}>
                             <p className={`text-[9px] mr-1 ${isMyMessage ? "text-green-200" : "text-gray-400"}`}>{msg.time}</p>
                             {isMyMessage && <MessageStatus status={msg.status} />}
