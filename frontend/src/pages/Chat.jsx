@@ -266,19 +266,19 @@ function Chat({ userData, socket }) {
     typingTimeoutRef.current = setTimeout(() => socket.emit("stop_typing", roomId), 2000);
   };
 
-  if (!userData) return <div className="min-h-screen bg-[#0b0f19] flex items-center justify-center text-blue-400 font-bold animate-pulse">Loading Chat...</div>;
+  if (!userData) return <div className="h-[100dvh] w-full bg-[#0b0f19] flex items-center justify-center text-blue-400 font-bold animate-pulse">Loading Chat...</div>;
 
   return (
-    // ✅ CONTAINER: Force 100vh no matter what
-    <div className="w-full h-screen bg-[#0b0f19] flex relative overflow-hidden font-sans">
+    // ✅ GRID LAYOUT: Forces the input bar to the bottom cell
+    <div className="w-full h-[100dvh] bg-[#0b0f19] grid grid-cols-[1fr] md:grid-cols-[350px_1fr] overflow-hidden font-sans">
       
       {/* 🔮 BACKGROUND */}
-      <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] bg-violet-600 rounded-full mix-blend-screen filter blur-[150px] opacity-20 animate-blob pointer-events-none"></div>
-      <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-blue-600 rounded-full mix-blend-screen filter blur-[150px] opacity-20 animate-blob animation-delay-4000 pointer-events-none"></div>
+      <div className="fixed top-[-20%] left-[-10%] w-[600px] h-[600px] bg-violet-600 rounded-full mix-blend-screen filter blur-[150px] opacity-20 animate-blob pointer-events-none"></div>
+      <div className="fixed bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-blue-600 rounded-full mix-blend-screen filter blur-[150px] opacity-20 animate-blob animation-delay-4000 pointer-events-none"></div>
 
       {/* 🛑 SIDEBAR */}
       {!isDirectMessage && (
-        <div className="w-[350px] h-full bg-black/20 backdrop-blur-xl border-r border-white/5 hidden md:flex flex-col z-20">
+        <div className="hidden md:flex flex-col h-full bg-black/20 backdrop-blur-xl border-r border-white/5 z-20">
            <div className="p-6 border-b border-white/5 bg-white/5 backdrop-blur-md">
              <div className="flex items-center gap-4">
                <img src={userData.photoURL} className="w-12 h-12 rounded-full border-2 border-blue-500/50" />
@@ -303,8 +303,8 @@ function Chat({ userData, socket }) {
         </div>
       )}
 
-      {/* 💬 MAIN CHAT AREA */}
-      <div className="flex-1 h-full flex flex-col relative z-10">
+      {/* 💬 MAIN CHAT AREA - GRID ROWS FOR HEADER / BODY / INPUT */}
+      <div className={`h-full flex flex-col relative z-10 ${!isDirectMessage ? 'col-span-1' : 'col-span-2 md:col-span-1'}`}>
         
         {/* HEADER */}
         <div className="h-16 bg-black/40 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-30 shadow-sm shrink-0">
@@ -324,8 +324,8 @@ function Chat({ userData, socket }) {
              </div>
         </div>
 
-        {/* MESSAGES - Added padding-bottom to prevent overlap */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 pb-24 custom-scrollbar bg-transparent">
+        {/* MESSAGES - FLEX 1 TO FILL SPACE */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6 custom-scrollbar bg-transparent">
             {messageList.map((msg, index) => {
               const isMyMessage = userData.realName === msg.author;
               const isSystem = msg.author === "System";
@@ -366,13 +366,13 @@ function Chat({ userData, socket }) {
             <div ref={bottomRef} />
         </div>
 
-        {/* 🛠️ INPUT AREA - ABSOLUTE POSITIONED (Bulletproof Fix) */}
-        <div className="absolute bottom-0 left-0 w-full bg-black/60 backdrop-blur-2xl border-t border-white/10 p-3 flex items-center gap-2 z-50">
+        {/* 🛠️ INPUT AREA - GRID CELL (Prevents Floating) */}
+        <div className="w-full bg-black/60 backdrop-blur-2xl border-t border-white/10 p-3 shrink-0 z-30">
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*,video/*" onChange={selectFile} />
             
             {showEmoji && <div className="absolute bottom-20 left-4 z-50 animate-fade-in-up shadow-2xl rounded-2xl overflow-hidden"><EmojiPicker onEmojiClick={(e)=>setCurrentMessage(prev=>prev+e.emoji)} theme="dark" height={350} searchDisabled skinTonesDisabled/></div>}
 
-            <div className="flex-1 flex gap-2 items-center bg-white/5 p-1.5 pr-2 rounded-full border border-white/10 focus-within:border-blue-500/50 focus-within:bg-black/40 transition-all">
+            <div className="flex gap-2 items-center bg-white/5 p-1.5 pr-2 rounded-full border border-white/10 focus-within:border-blue-500/50 focus-within:bg-black/40 transition-all">
                 <button onClick={() => setShowEmoji(!showEmoji)} className="text-lg text-gray-400 p-2 hover:text-yellow-400 hover:bg-white/5 rounded-full transition">😊</button>
                 <button onClick={() => fileInputRef.current.click()} className="text-lg text-gray-400 p-2 hover:text-cyan-400 hover:bg-white/5 rounded-full transition">📎</button>
                 
