@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { auth, googleProvider, db } from "../firebase";
-import { signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile, signOut } from "firebase/auth"; // 🆕 Added signOut
+import { signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 
 export const Auth = () => {
@@ -10,22 +10,20 @@ export const Auth = () => {
   const [realName, setRealName] = useState("");
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
-  const [successMsg, setSuccessMsg] = useState(""); // 🆕 Success Message State
   const [loading, setLoading] = useState(false);
 
   const handleAuth = async (e) => {
     e.preventDefault();
     setError("");
-    setSuccessMsg(""); // Clear previous success messages
     setLoading(true);
 
     try {
       if (isLogin) {
-        // --- LOGIN LOGIC ---
+        // --- LOGIN ---
         await signInWithEmailAndPassword(auth, email, password);
-        // App.jsx detects login automatically
+        // App.jsx will automatically detect this and switch to Home
       } else {
-        // --- SIGNUP LOGIC ---
+        // --- SIGNUP ---
         const res = await createUserWithEmailAndPassword(auth, email, password);
         
         // 1. Update Profile
@@ -40,12 +38,8 @@ export const Auth = () => {
           photoURL: "https://cdn-icons-png.flaticon.com/512/149/149071.png",
           createdAt: new Date()
         });
-
-        // 3. 🆕 FORCE LOGOUT & SHOW SUCCESS
-        await signOut(auth); // Kick them out immediately
-        setLoading(false);
-        setIsLogin(true); // Switch to Login Mode
-        setSuccessMsg("Account created successfully! Please log in."); // Show Banner
+        
+        // No more signOut()! Just let them in.
       }
     } catch (err) {
       setError(err.message.replace("Firebase: ", ""));
@@ -77,18 +71,12 @@ export const Auth = () => {
 
   return (
     <div className="flex items-center justify-center h-screen bg-gray-900 text-white font-sans">
-      <div className="bg-gray-800 p-8 rounded-lg shadow-lg w-96 flex flex-col gap-4">
+      <div className="bg-gray-800 p-8 rounded-lg shadow-lg w-96 flex flex-col gap-4 animate-fade-in">
         <h2 className="text-3xl font-bold text-center text-green-500 mb-2">
           {isLogin ? "Welcome Back" : "Create Account"}
         </h2>
         
-        {/* 🆕 ERROR BANNER */}
         {error && <p className="text-red-400 text-sm text-center bg-red-900/20 p-2 rounded border border-red-500">{error}</p>}
-
-        {/* 🆕 SUCCESS BANNER */}
-        {successMsg && <div className="bg-green-900/30 text-green-400 p-3 rounded border border-green-500 text-center text-sm font-bold animate-pulse">
-            {successMsg}
-        </div>}
 
         <form onSubmit={handleAuth} className="flex flex-col gap-4">
           {!isLogin && (
@@ -141,7 +129,7 @@ export const Auth = () => {
 
         <p className="text-center text-gray-400 text-sm mt-4">
           {isLogin ? "Don't have an account?" : "Already have an account?"} 
-          <span onClick={() => { setIsLogin(!isLogin); setSuccessMsg(""); setError(""); }} className="text-green-500 cursor-pointer ml-1 hover:underline">
+          <span onClick={() => { setIsLogin(!isLogin); setError(""); }} className="text-green-500 cursor-pointer ml-1 hover:underline">
             {isLogin ? "Sign Up" : "Log In"}
           </span>
         </p>
