@@ -3,14 +3,18 @@ import { useParams, useNavigate } from "react-router-dom";
 import EmojiPicker from "emoji-picker-react";
 import { storage } from "../firebase";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { v4 as uuidv4 } from 'uuid'; 
 
-// ✅ TICK COMPONENT
-const MessageStatus = ({ status }) => {
-  if (status === "sent") return <span className="text-gray-400 text-[10px] ml-1">✓</span>;
-  if (status === "delivered") return <span className="text-gray-400 text-[10px] ml-1">✓✓</span>;
+// ✅ 1. TICK COMPONENT (Now handles old messages too)
+const MessageStatus = ({ status, isMyMessage }) => {
+  if (!isMyMessage) return null; // Only show ticks on MY messages
+  
+  // Status Icons
+  if (status === "sent") return <span className="text-gray-500 text-[10px] ml-1">✓</span>;
+  if (status === "delivered") return <span className="text-gray-500 text-[10px] ml-1">✓✓</span>;
   if (status === "read") return <span className="text-blue-500 text-[10px] ml-1">✓✓</span>;
-  return null; 
+  
+  // Fallback for old messages
+  return <span className="text-gray-500 text-[10px] ml-1">✓</span>; 
 };
 
 function Chat({ userData, socket }) {
@@ -55,18 +59,21 @@ function Chat({ userData, socket }) {
   useEffect(() => {
     const handleReceiveMessage = (data) => {
       setMessageList((list) => {
-        // Send Delivered Status immediately
+        // ✅ If I receive a message, tell the sender it is DELIVERED
         if (data.author !== userData.realName) {
+            console.log("Marking delivered:", data.id);
             socket.emit("message_status_update", { room: roomId, messageId: data.id, status: "delivered" });
         }
-        
+
         const newList = [...list, data];
         localStorage.setItem(`chat_${roomId}`, JSON.stringify(newList)); 
         return newList;
       });
     };
 
+    // ✅ HANDLE STATUS UPDATE (Grey -> Blue)
     const handleStatusUpdate = (data) => {
+        console.log("Status Update Received:", data);
         setMessageList((list) => {
             const newList = list.map((msg) => {
                 if (msg.id === data.messageId) {
@@ -103,33 +110,26 @@ function Chat({ userData, socket }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messageList, typingUser, uploading, isRecording]);
 
-  // 🆕 4. INTELLIGENT "MARK AS READ" TRIGGER
-  // This runs whenever messageList changes OR when you focus the window
+  // 4. INTELLIGENT "MARK AS READ" TRIGGER
   useEffect(() => {
     const markRead = () => {
         if (document.visibilityState === 'visible') {
             messageList.forEach(msg => {
-                // If the message is NOT mine and NOT read yet, tell them I saw it!
+                // Only mark as read if it's NOT mine and NOT already read
                 if (msg.author !== userData.realName && msg.status !== "read") {
                     socket.emit("message_status_update", { room: roomId, messageId: msg.id, status: "read" });
-                    
-                    // Optimistically update my local view too so I don't span the server
-                    // (Optional, but good for performance)
                 }
             });
         }
     };
 
-    // Run immediately (in case I just opened the chat)
     markRead();
-
-    // Run whenever I click back onto the tab
     window.addEventListener("focus", markRead);
-    window.addEventListener("visibilitychange", markRead);
+    window.addEventListener("click", markRead); // Also check on click
 
     return () => {
         window.removeEventListener("focus", markRead);
-        window.removeEventListener("visibilitychange", markRead);
+        window.removeEventListener("click", markRead);
     };
   }, [messageList, roomId, userData, socket]);
 
@@ -138,7 +138,7 @@ function Chat({ userData, socket }) {
 
   const sendMessage = async () => {
     if (currentMessage !== "") {
-      const msgId = uuidv4(); // Generate unique ID
+      const msgId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`; // ✅ Simple ID Generator
       const messageData = {
         id: msgId,
         room: roomId,
@@ -169,7 +169,7 @@ function Chat({ userData, socket }) {
         const fileRef = ref(storage, `chat_files/${Date.now()}_${file.name || "audio.webm"}`);
         await uploadBytes(fileRef, file);
         const url = await getDownloadURL(fileRef);
-        const msgId = uuidv4();
+        const msgId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
         const messageData = {
             id: msgId,
@@ -266,6 +266,7 @@ function Chat({ userData, socket }) {
                     {typingUser && <p className="text-xs text-green-400 animate-pulse">{typingUser} typing...</p>}
                 </div>
             </div>
+             {/* 🗑️ Clear Button to fix missing ticks on old messages */}
              <button onClick={() => { localStorage.removeItem(`chat_${roomId}`); setMessageList([]); }} className="text-gray-400 text-xs">Clear Chat</button>
              {isDirectMessage && <button onClick={() => navigate("/")} className="text-red-400 text-xs ml-4 border border-red-500 p-1 rounded">Exit</button>}
         </div>
@@ -286,7 +287,8 @@ function Chat({ userData, socket }) {
                         
                         <div className={`flex justify-end items-center mt-1 absolute bottom-1 right-2`}>
                             <p className={`text-[9px] mr-1 ${isMyMessage ? "text-green-200" : "text-gray-400"}`}>{msg.time}</p>
-                            {isMyMessage && <MessageStatus status={msg.status} />}
+                            {/* ✅ CALLING THE TICK COMPONENT */}
+                            <MessageStatus status={msg.status} isMyMessage={isMyMessage} />
                         </div>
                     </div>
                 </div>
