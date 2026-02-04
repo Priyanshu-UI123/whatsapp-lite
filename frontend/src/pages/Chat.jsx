@@ -55,11 +55,19 @@ function Chat({ userData, socket }) {
   const bottomRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
-  // 1. JOIN ROOM
+  // 1. JOIN ROOM & CLEAR UNREAD STATUS
   useEffect(() => {
     if (userData && roomId) {
-       const joinRoom = () => {
+       const joinRoom = async () => {
           socket.emit("join_room", { room: roomId, username: userData.realName, photo: userData.photoURL });
+          
+          // ✅ CLEAR UNREAD STATUS ON ENTRY
+          if(isDirectMessage) {
+              const myChatRef = doc(db, "userChats", userData.uid);
+              try {
+                  await updateDoc(myChatRef, { [`${roomId}.unread`]: false });
+              } catch(e) { console.log("Error clearing unread:", e); }
+          }
        };
        joinRoom();
        socket.on("connect", joinRoom);
@@ -75,7 +83,7 @@ function Chat({ userData, socket }) {
 
   // 2. SOCKET LISTENERS
   useEffect(() => {
-    const handleReceiveMessage = (data) => {
+    const handleReceiveMessage = async (data) => {
       setMessageList((list) => {
         if (data.author !== userData.realName) {
             socket.emit("message_status_update", { room: roomId, messageId: data.id, status: "delivered" });
@@ -85,6 +93,14 @@ function Chat({ userData, socket }) {
         localStorage.setItem(`chat_${roomId}`, JSON.stringify(newList)); 
         return newList;
       });
+
+      // ✅ IF I AM IN THE CHAT, KEEP IT READ
+      if (isDirectMessage && data.author !== userData.realName) {
+         const myChatRef = doc(db, "userChats", userData.uid);
+         try {
+             await updateDoc(myChatRef, { [`${roomId}.unread`]: false });
+         } catch(e) {}
+      }
     };
 
     const handleStatusUpdate = (data) => {
@@ -124,7 +140,7 @@ function Chat({ userData, socket }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messageList, typingUser, replyTo]);
 
-  // 4. MARK READ
+  // 4. MARK READ ON FOCUS
   useEffect(() => {
     const markRead = () => {
         if (document.visibilityState === 'visible') {
@@ -152,7 +168,8 @@ function Chat({ userData, socket }) {
         const chatData = {
              userInfo: { uid: otherUid },
              lastMessage: msgContent,
-             date: serverTimestamp()
+             date: serverTimestamp(),
+             unread: false // ✅ My list is always read (I sent it)
         };
 
         if (!myChatSnap.exists() || !myChatSnap.data()[roomId]) {
@@ -163,12 +180,14 @@ function Chat({ userData, socket }) {
 
         await setDoc(myChatRef, { [roomId]: chatData }, { merge: true });
 
+        // ✅ MARK AS UNREAD FOR THEM
         const theirChatRef = doc(db, "userChats", otherUid);
         const theirChatSnap = await getDoc(theirChatRef);
         const theirChatData = {
             userInfo: { uid: userData.uid, displayName: userData.realName, photoURL: userData.photoURL },
             lastMessage: msgContent,
-            date: serverTimestamp()
+            date: serverTimestamp(),
+            unread: true // 🔔 THIS TRIGGERS THEIR GLOW
         };
         await setDoc(theirChatRef, { [roomId]: theirChatData }, { merge: true });
 
@@ -224,7 +243,7 @@ function Chat({ userData, socket }) {
       <div className="fixed top-[-20%] left-[-10%] w-[600px] h-[600px] bg-violet-600 rounded-full mix-blend-screen filter blur-[150px] opacity-20 animate-blob pointer-events-none"></div>
       <div className="fixed bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-blue-600 rounded-full mix-blend-screen filter blur-[150px] opacity-20 animate-blob animation-delay-4000 pointer-events-none"></div>
 
-      {/* 🛑 SIDEBAR (Hidden in Private Chat) */}
+      {/* 🛑 SIDEBAR */}
       {!isDirectMessage && (
         <div className="hidden md:flex flex-col h-full bg-black/20 backdrop-blur-xl border-r border-white/5 z-20 overflow-hidden">
            <div className="p-6 border-b border-white/5 bg-white/5 backdrop-blur-md">
@@ -254,14 +273,10 @@ function Chat({ userData, socket }) {
       {/* 💬 MAIN CHAT AREA */}
       <div className="h-full flex flex-col relative z-10 w-full overflow-hidden">
         
-        {/* HEADER - Updated Back Button Logic */}
+        {/* HEADER */}
         <div className="h-16 bg-black/40 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-30 shadow-sm shrink-0">
             <div className="flex items-center gap-4">
-                {/* ✅ FIX: The back button is now visible if it's a Direct Message (no sidebar) OR if we are on mobile.
-                   It is only hidden if it's a Group Chat on Desktop (since the sidebar is there).
-                */}
                 <button onClick={() => navigate("/")} className={`text-gray-400 hover:text-white transition p-2 ${!isDirectMessage ? 'md:hidden' : ''}`}>←</button>
-                
                 <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20">
                     {isDirectMessage ? "👤" : "#"}
                 </div>
@@ -272,7 +287,6 @@ function Chat({ userData, socket }) {
             </div>
              
              <div className="flex items-center gap-3">
-                 {/* ✅ NEW DASHBOARD BUTTON for Private Chats */}
                  {isDirectMessage && (
                     <button onClick={() => navigate("/")} className="text-gray-300 hover:text-white text-xs px-3 py-2 rounded-lg border border-white/10 hover:bg-white/10 transition bg-blue-900/20">
                         Dashboard
@@ -288,25 +302,20 @@ function Chat({ userData, socket }) {
               const isMyMessage = userData.realName === msg.author;
               const isSystem = msg.author === "System";
 
-              // 📅 DATE SEPARATORS
               const msgDate = msg.fullDate ? new Date(msg.fullDate).toDateString() : null;
               const showDate = msgDate && msgDate !== lastDate;
               if (msgDate) lastDate = msgDate;
 
-              // 🛑 SYSTEM MESSAGE
               if (isSystem) {
                   return (
                     <div key={index} className="flex justify-center my-2">
-                        <span className="text-gray-500 text-[10px] font-mono tracking-wider opacity-75">
-                           {msg.message}
-                        </span>
+                        <span className="text-gray-500 text-[10px] font-mono tracking-wider opacity-75">{msg.message}</span>
                     </div>
                   );
               }
 
               return (
                 <div key={index}>
-                    {/* Render Date Divider */}
                     {showDate && (
                         <div className="flex justify-center my-6">
                             <span className="bg-white/5 border border-white/10 text-gray-400 text-[10px] px-3 py-1 rounded-full uppercase tracking-widest font-bold">
@@ -324,7 +333,6 @@ function Chat({ userData, socket }) {
                                 : "bg-white/5 text-gray-200 rounded-bl-none border-white/10 hover:bg-white/15"
                             }`}>
                             
-                            {/* ↩️ REPLY PREVIEW */}
                             {msg.replyTo && (
                                 <div className={`mb-2 p-2 rounded-lg text-xs border-l-4 ${isMyMessage ? "bg-black/20 border-white/50" : "bg-black/40 border-blue-500"}`}>
                                     <p className="font-bold opacity-80">{msg.replyTo.author}</p>
@@ -353,7 +361,6 @@ function Chat({ userData, socket }) {
               );
             })}
             
-            {/* ✨ ANIMATED TYPING BUBBLES */}
             {typingUser && typingUser !== userData.realName && (
                 <div className="ml-12 animate-fade-in-up">
                     <p className="text-[10px] text-gray-500 mb-1 ml-1">{typingUser} is typing...</p>
@@ -367,7 +374,6 @@ function Chat({ userData, socket }) {
         {/* 🛠️ INPUT AREA */}
         <div className="w-full bg-black/60 backdrop-blur-2xl border-t border-white/10 p-3 shrink-0 z-30 flex flex-col">
             
-            {/* ↩️ REPLYING TO BANNER */}
             {replyTo && (
                 <div className="flex justify-between items-center bg-blue-900/30 p-2 mb-2 rounded-lg border-l-4 border-blue-500 animate-fade-in-up">
                     <div className="text-sm">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { collection, query, where, getDocs, doc, onSnapshot } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, onSnapshot, updateDoc } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { signOut } from "firebase/auth";
 
@@ -61,7 +61,15 @@ function Home({ userData, socket }) {
     }
   };
 
-  const openRecentChat = (chat) => {
+  // ✅ CLEAR UNREAD STATUS ON CLICK
+  const openRecentChat = async (chat) => {
+      // 1. Mark as Read in Database
+      const chatRef = doc(db, "userChats", userData.uid);
+      try {
+          await updateDoc(chatRef, { [`${chat.roomId}.unread`]: false });
+      } catch (e) { console.log("Error marking read:", e); }
+
+      // 2. Navigate
       socket.emit("join_room", { room: chat.roomId, username: userData.realName, photo: userData.photoURL });
       navigate(`/chat/${chat.roomId}`);
   };
@@ -69,12 +77,11 @@ function Home({ userData, socket }) {
   return (
     <div className="min-h-screen bg-[#0f172a] flex items-center justify-center font-sans relative overflow-hidden">
       
-      {/* 🌟 BACKGROUND GLOW EFFECTS (Ambient Light) */}
+      {/* 🔮 BACKGROUND */}
       <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-40 animate-blob"></div>
       <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-emerald-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-40 animate-blob animation-delay-2000"></div>
-      <div className="absolute bottom-[-20%] left-[20%] w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-40 animate-blob animation-delay-4000"></div>
 
-      {/* 📦 GLASSMOPHISM CONTAINER */}
+      {/* 📦 CONTAINER */}
       <div className="w-full max-w-5xl h-[90vh] bg-gray-900/60 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl flex overflow-hidden z-10 animate-fade-in-up">
         
         {/* 👈 LEFT SIDEBAR */}
@@ -83,10 +90,7 @@ function Home({ userData, socket }) {
             {/* Header */}
             <div className="p-6 flex justify-between items-center border-b border-white/5 bg-white/5 backdrop-blur-sm">
                 <div className="flex items-center gap-3">
-                    <div className="relative group cursor-pointer">
-                        <img src={userData.photoURL} className="w-12 h-12 rounded-full border-2 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] transition transform group-hover:scale-110 object-cover" />
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-gray-900 rounded-full"></div>
-                    </div>
+                    <img src={userData.photoURL} className="w-12 h-12 rounded-full border-2 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] object-cover" />
                     <div>
                         <h2 className="text-white font-bold text-lg">{userData.realName}</h2>
                         <p className="text-emerald-400 text-xs font-medium tracking-wide">ONLINE</p>
@@ -104,20 +108,30 @@ function Home({ userData, socket }) {
                 {chats.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-40 text-gray-500 opacity-60">
                         <p className="text-sm">No conversations yet.</p>
-                        <p className="text-xs">Start a chat to see it here.</p>
                     </div>
                 )}
 
                 {chats.map((chat) => (
                     <div key={chat.roomId} onClick={() => openRecentChat(chat)} 
-                         className="group flex items-center gap-4 p-3 rounded-xl cursor-pointer hover:bg-white/10 transition-all duration-300 border border-transparent hover:border-white/5 hover:shadow-lg hover:scale-[1.02]">
-                        <img src={chat.userInfo.photoURL} className="w-12 h-12 rounded-full object-cover group-hover:ring-2 ring-emerald-500 transition-all" />
+                         className={`group flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all duration-300 border 
+                         ${chat.unread ? 'bg-white/10 border-emerald-500/50 shadow-[inset_0_0_15px_rgba(16,185,129,0.1)]' : 'hover:bg-white/10 border-transparent hover:border-white/5'}
+                         `}>
+                        
+                        <div className="relative">
+                            <img src={chat.userInfo.photoURL} className={`w-12 h-12 rounded-full object-cover transition-all ${chat.unread ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-gray-900' : ''}`} />
+                            {chat.unread && <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-gray-900"></div>}
+                        </div>
+
                         <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-center mb-1">
-                                <h4 className="text-white font-semibold text-sm truncate">{chat.userInfo.displayName}</h4>
+                                <h4 className={`font-semibold text-sm truncate ${chat.unread ? 'text-white font-bold' : 'text-gray-300'}`}>{chat.userInfo.displayName}</h4>
                                 <span className="text-[10px] text-gray-500">{new Date(chat.date?.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                             </div>
-                            <p className="text-gray-400 text-xs truncate group-hover:text-emerald-300 transition-colors">{chat.lastMessage}</p>
+                            <div className="flex justify-between items-center">
+                                <p className={`text-xs truncate ${chat.unread ? 'text-emerald-300 font-medium' : 'text-gray-400'}`}>{chat.lastMessage}</p>
+                                {/* 🔔 NEW MESSAGE INDICATOR */}
+                                {chat.unread && <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]"></div>}
+                            </div>
                         </div>
                     </div>
                 ))}
@@ -126,7 +140,6 @@ function Home({ userData, socket }) {
 
         {/* 👉 RIGHT MAIN AREA */}
         <div className="hidden md:flex flex-1 flex-col items-center justify-center relative">
-            {/* Cool Background Pattern for Right Side */}
             <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 z-0"></div>
             <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-black z-[-1]"></div>
 
@@ -139,12 +152,12 @@ function Home({ userData, socket }) {
                 </div>
 
                 {/* SEARCH CARD */}
-                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-6 rounded-2xl shadow-xl transition-all hover:border-emerald-500/30 hover:shadow-emerald-900/20">
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-6 rounded-2xl shadow-xl transition-all hover:border-emerald-500/30">
                     <h3 className="text-emerald-400 text-sm font-bold uppercase mb-4 tracking-wider">Start a Conversation</h3>
                     
                     <div className="relative group">
                         <input type="text" placeholder="Search by username..." 
-                            className="w-full bg-black/40 text-white p-4 pl-12 rounded-xl outline-none border border-white/10 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all placeholder-gray-500"
+                            className="w-full bg-black/40 text-white p-4 pl-12 rounded-xl outline-none border border-white/10 focus:border-emerald-500 transition-all placeholder-gray-500"
                             onChange={(e) => setSearchUsername(e.target.value)} value={searchUsername} 
                         />
                         <span className="absolute left-4 top-4 text-gray-400 group-focus-within:text-emerald-400 transition-colors">🔍</span>
@@ -173,22 +186,19 @@ function Home({ userData, socket }) {
                     <div className="h-[1px] bg-gradient-to-r from-transparent via-gray-600 to-transparent flex-1"></div>
                 </div>
 
-                {/* JOIN GROUP INPUT */}
                 <div className="relative group">
                      <input type="text" placeholder="Enter Room ID to Join..." 
-                        className="w-full bg-black/40 text-white p-4 pl-4 rounded-xl outline-none border border-white/10 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-500"
+                        className="w-full bg-black/40 text-white p-4 pl-4 rounded-xl outline-none border border-white/10 focus:border-blue-500 transition-all placeholder-gray-500"
                         onChange={(e) => setRoom(e.target.value)} 
                     />
                     <button onClick={joinRoom} className="mt-3 w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-900/30 transition-all transform hover:scale-[1.02] active:scale-[0.98]">
                         Join Group Chat
                     </button>
                 </div>
-
             </div>
         </div>
       </div>
       
-      {/* CSS FOR ANIMATIONS */}
       <style>{`
         @keyframes blob {
           0% { transform: translate(0px, 0px) scale(1); }
@@ -198,7 +208,6 @@ function Home({ userData, socket }) {
         }
         .animate-blob { animation: blob 7s infinite; }
         .animation-delay-2000 { animation-delay: 2s; }
-        .animation-delay-4000 { animation-delay: 4s; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-track { bg: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
