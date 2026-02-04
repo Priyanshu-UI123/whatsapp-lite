@@ -30,6 +30,15 @@ const MessageStatus = ({ status, isMyMessage }) => {
   return <span className="text-white/40 text-[10px] ml-1">✓</span>; 
 };
 
+// ✨ NEW: ANIMATED TYPING BUBBLES COMPONENT
+const TypingIndicator = () => (
+  <div className="flex items-center gap-1 bg-white/5 p-3 rounded-2xl rounded-tl-none w-fit mb-4 border border-white/5 animate-fade-in-up">
+    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
+    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></div>
+  </div>
+);
+
 function Chat({ userData, socket }) {
   const { roomId } = useParams();
   const navigate = useNavigate();
@@ -254,7 +263,7 @@ function Chat({ userData, socket }) {
                 </div>
                 <div>
                     <h2 className="font-bold text-white text-lg tracking-wide">{isDirectMessage ? "Private Chat" : `Room: ${roomId}`}</h2>
-                    {typingUser && <p className="text-xs text-blue-400 animate-pulse font-medium tracking-wide">Typing...</p>}
+                    <p className="text-xs text-gray-400 font-medium tracking-wide">Encrypted Connection</p>
                 </div>
             </div>
              
@@ -274,7 +283,7 @@ function Chat({ userData, socket }) {
               const showDate = msgDate && msgDate !== lastDate;
               if (msgDate) lastDate = msgDate;
 
-              // 🛑 SYSTEM MESSAGE (NEW MINIMAL DESIGN)
+              // 🛑 SYSTEM MESSAGE (MINIMAL)
               if (isSystem) {
                   return (
                     <div key={index} className="flex justify-center my-2">
@@ -305,7 +314,7 @@ function Chat({ userData, socket }) {
                                 : "bg-white/5 text-gray-200 rounded-bl-none border-white/10 hover:bg-white/15"
                             }`}>
                             
-                            {/* ↩️ RENDER REPLY PREVIEW */}
+                            {/* ↩️ REPLY PREVIEW */}
                             {msg.replyTo && (
                                 <div className={`mb-2 p-2 rounded-lg text-xs border-l-4 ${isMyMessage ? "bg-black/20 border-white/50" : "bg-black/40 border-blue-500"}`}>
                                     <p className="font-bold opacity-80">{msg.replyTo.author}</p>
@@ -333,6 +342,15 @@ function Chat({ userData, socket }) {
                 </div>
               );
             })}
+            
+            {/* ✨ ANIMATED TYPING BUBBLES */}
+            {typingUser && typingUser !== userData.realName && (
+                <div className="ml-12 animate-fade-in-up">
+                    <p className="text-[10px] text-gray-500 mb-1 ml-1">{typingUser} is typing...</p>
+                    <TypingIndicator />
+                </div>
+            )}
+            
             <div ref={bottomRef} />
         </div>
 
