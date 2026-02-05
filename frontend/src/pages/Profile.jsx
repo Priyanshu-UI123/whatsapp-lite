@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "../firebase";
+import { db } from "../firebase"; // ❌ Removed 'storage' import
 
 function Profile({ userData }) {
   const navigate = useNavigate();
@@ -29,30 +28,42 @@ function Profile({ userData }) {
     fetchProfile();
   }, [userData]);
 
-  const handleImageUpload = async (e) => {
+  // 🛠️ NEW: CONVERT IMAGE TO TEXT (BASE64)
+  const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    setLoading(true);
-    try {
-      // 1. Upload to Firebase Storage
-      const storageRef = ref(storage, `profile_pictures/${userData.uid}_${Date.now()}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      
-      // 2. Update Local State immediately for preview
-      setPhotoURL(url);
-
-      // 3. Update Firestore
-      const userRef = doc(db, "users", userData.uid);
-      await updateDoc(userRef, { photoURL: url });
-      
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      alert("Failed to upload image. Make sure Storage is enabled in Firebase Console.");
-    } finally {
-      setLoading(false);
+    // 1. Check File Size (Max 100KB to prevent Database lag)
+    if (file.size > 100 * 1024) {
+        alert("Image too big! Please use an image smaller than 100KB.");
+        return;
     }
+
+    // 2. Convert to Base64 String
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    
+    setLoading(true);
+    reader.onloadend = async () => {
+        const base64Image = reader.result;
+        
+        try {
+            // 3. Update State
+            setPhotoURL(base64Image);
+
+            // 4. Save directly to Database
+            const userRef = doc(db, "users", userData.uid);
+            await updateDoc(userRef, { photoURL: base64Image });
+            
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 3000);
+        } catch (error) {
+            console.error("Error saving image:", error);
+            alert("Failed to save image.");
+        } finally {
+            setLoading(false);
+        }
+    };
   };
 
   const handleSave = async () => {
