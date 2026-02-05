@@ -39,8 +39,7 @@ function getUsersInRoom(room) {
 io.on("connection", (socket) => {
   console.log(`User Connected: ${socket.id}`);
 
-  // ✅ 1. CRITICAL FIX: Setup Private User Channel
-  // This allows us to call a specific person by their UID
+  // 1. SETUP PRIVATE CHANNEL
   socket.on("setup", (userData) => {
     socket.join(userData.uid); 
     console.log(`User ${userData.uid} joined their private channel`);
@@ -77,17 +76,16 @@ io.on("connection", (socket) => {
     socket.to(data.room).emit("message_status_updated", data);
   });
 
-  // 📞 CALLING EVENTS (Fixed for Private Calling) 📞
+  // 📞 CALLING EVENTS (FIXED: Passing callType) 📞
   
   // 1. Caller initiates call
-  socket.on("callUser", ({ userToCall, signalData, from, name }) => {
-      // ✅ FIX: Use 'io.to' to send to the specific User ID channel
-      io.to(userToCall).emit("callUser", { signal: signalData, from, name });
+  socket.on("callUser", ({ userToCall, signalData, from, name, callType }) => {
+      // ✅ CRITICAL FIX: We are now passing 'callType' ('video' or 'audio') to the receiver
+      io.to(userToCall).emit("callUser", { signal: signalData, from, name, callType });
   });
 
   // 2. Receiver answers call
   socket.on("answerCall", (data) => {
-      // ✅ FIX: Send answer back to the Caller's ID
       io.to(data.to).emit("callAccepted", data.signal);
   });
 
