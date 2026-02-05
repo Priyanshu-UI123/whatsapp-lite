@@ -4,13 +4,13 @@ import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from "./firebase";
 import { socket } from "./socket"; 
-import Profile from "./pages/Profile";
 
 // 🆕 IMPORT NEW PAGES
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Home from "./pages/Home";
 import Chat from "./pages/Chat";
+import Profile from "./pages/Profile"; // 👈 1. IMPORT PROFILE PAGE
 
 function App() {
   const [user, setUser] = useState(null);
@@ -21,6 +21,7 @@ function App() {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
+        // Real-time listener for user data changes
         const unsubDb = onSnapshot(doc(db, "users", currentUser.uid), (docSnap) => {
           if (docSnap.exists()) {
              setUserData(docSnap.data());
@@ -57,20 +58,12 @@ function App() {
           {/* PROTECTED ROUTES */}
           <Route path="/" element={user ? <Home userData={userData} socket={socket} /> : <Navigate to="/login" />} />
           <Route path="/chat/:roomId" element={user ? <Chat userData={userData} socket={socket} /> : <Navigate to="/login" />} />
+          
+          {/* ✅ 2. ADD PROFILE ROUTE */}
+          <Route path="/profile" element={user ? <Profile userData={userData} /> : <Navigate to="/login" />} />
         </Routes>
       </div>
     </BrowserRouter>
-  );
-  return (
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={user ? <Home userData={user} socket={socket} /> : <Login />} />
-          <Route path="/chat/:roomId" element={user ? <Chat userData={user} socket={socket} /> : <Login />} />
-          
-          {/* ✅ ADD THIS NEW ROUTE */}
-          <Route path="/profile" element={user ? <Profile userData={user} /> : <Login />} />
-        </Routes>
-      </BrowserRouter>
   );
 }
 
