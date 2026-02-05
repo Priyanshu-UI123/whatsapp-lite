@@ -17,23 +17,25 @@ const CallModal = ({ callStatus, otherUser, onAnswer, onReject, onEnd, debugLogs
     if (callStatus === "idle") return null;
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center animate-fade-in">
-            <div className="flex flex-col items-center gap-6 p-8 bg-white/5 rounded-3xl border border-white/10 w-[90%] max-w-md">
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center animate-fade-in p-4">
+            <div className="flex flex-col items-center gap-6 p-8 bg-[#1e293b] rounded-3xl border border-white/10 w-full max-w-sm shadow-2xl">
+                
+                {/* 👤 Avatar */}
                 <div className="relative">
                     <div className="absolute inset-0 bg-blue-500 rounded-full blur-xl animate-pulse"></div>
-                    <img src={otherUser?.photoURL} className="relative w-32 h-32 rounded-full border-4 border-black object-cover z-10" />
+                    <img src={otherUser?.photoURL} className="relative w-28 h-28 rounded-full border-4 border-[#0f172a] object-cover z-10" />
                 </div>
                 
-                <h2 className="text-2xl font-bold text-white mt-4">{otherUser?.realName}</h2>
-                <p className="text-blue-400 font-mono tracking-widest uppercase text-sm animate-pulse">
-                    {callStatus === "calling" && "Calling..."}
+                <h2 className="text-2xl font-bold text-white mt-2">{otherUser?.realName}</h2>
+                <p className="text-blue-400 font-mono tracking-widest uppercase text-xs animate-pulse">
+                    {callStatus === "calling" && "Dialing..."}
                     {callStatus === "incoming" && "Incoming Call..."}
                     {callStatus === "connected" && "Connected"}
                 </p>
 
-                {/* 🛠️ DEEP DEBUG CONSOLE (Visible to User) */}
-                <div className="bg-black/50 p-3 rounded-lg w-full text-[10px] font-mono text-left space-y-1 h-32 overflow-y-auto border border-white/10">
-                    <p className="text-gray-400 font-bold border-b border-white/10 mb-1">CONNECTION LOGS:</p>
+                {/* 🛠️ DEBUG LOGS (Scrollable) */}
+                <div className="bg-black/50 p-3 rounded-lg w-full text-[10px] font-mono text-left space-y-1 h-24 overflow-y-auto border border-white/10">
+                    <p className="text-gray-500 font-bold border-b border-white/10 mb-1">LIVE LOGS:</p>
                     {debugLogs.map((log, i) => (
                         <p key={i} className={log.includes("ERROR") ? "text-red-400" : "text-green-400"}>
                             {">"} {log}
@@ -41,18 +43,28 @@ const CallModal = ({ callStatus, otherUser, onAnswer, onReject, onEnd, debugLogs
                     ))}
                 </div>
 
+                {/* 🔊 FORCE AUDIO BUTTON */}
                 {callStatus === "connected" && (
-                     <button onClick={onForceAudio} className="w-full bg-blue-600 py-3 rounded-xl font-bold text-white shadow-lg hover:bg-blue-500 transition">
-                         🔊 Tap to Hear Audio
+                     <button onClick={onForceAudio} className="w-full bg-blue-600/20 text-blue-400 border border-blue-500/50 py-2 rounded-xl font-bold text-xs hover:bg-blue-600 hover:text-white transition">
+                         🔊 Tap here if no sound
                      </button>
                 )}
 
-                <div className="flex gap-8 mt-4">
+                {/* 🔘 ACTION BUTTONS (Fixed Distortion) */}
+                <div className="flex items-center gap-8 mt-2">
                     {callStatus === "incoming" && (
-                        <button onClick={onAnswer} className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition animate-bounce">📞</button>
+                        <button onClick={onAnswer} className="w-16 h-16 shrink-0 bg-green-500 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition animate-bounce">
+                            <span className="text-2xl">📞</span>
+                        </button>
                     )}
-                    <button onClick={callStatus === "incoming" ? onReject : onEnd} className="w-16 h-16 bg-red-500 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-8 h-8 text-white"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 3.75L18 6m0 0l2.25 2.25M18 6l2.25-2.25M18 6l-2.25 2.25m-10.5-2.394l-.375.375-1.5-1.5.375-.375m4.875 13.5l.375.375 1.5-1.5-.375-.375m-6.375-3.375l-.375.375-1.5-1.5.375-.375m17.505-5.32c.507.094 1.01.216 1.503.364M3.75 20.25h16.5" /></svg>
+                    
+                    {/* 🔴 DECLINE / END BUTTON */}
+                    <button onClick={callStatus === "incoming" ? onReject : onEnd} 
+                        className="w-16 h-16 shrink-0 bg-red-500 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition hover:bg-red-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24" strokeWidth={0} stroke="currentColor" className="w-8 h-8">
+                            <path d="M20.25 6.75l-2.25-2.25-6 6-6-6-2.25 2.25 6 6-6 6 2.25 2.25 6-6 6 6 2.25-2.25-6-6 6-6z" /> 
+                            {/* Simple X Icon for clarity */}
+                        </svg>
                     </button>
                 </div>
             </div>
@@ -60,7 +72,7 @@ const CallModal = ({ callStatus, otherUser, onAnswer, onReject, onEnd, debugLogs
     );
 };
 
-// ... MessageStatus & TypingIndicator (Keep same) ...
+// ... MessageStatus & TypingIndicator (No changes needed) ...
 const MessageStatus = ({ status, isMyMessage }) => {
   if (!isMyMessage) return null;
   if (status === "sent") return <span className="text-white/40 text-[10px] ml-1">✓</span>;
@@ -89,7 +101,7 @@ function PersonalChat({ userData, socket }) {
   // 📞 CALL STATES
   const [callStatus, setCallStatus] = useState("idle"); 
   const [callerSignal, setCallerSignal] = useState(null);
-  const [logs, setLogs] = useState([]); // Array of logs
+  const [logs, setLogs] = useState([]); 
   
   const notificationAudio = useRef(new Audio(NOTIFICATION_SOUND));
   const ringtoneAudio = useRef(new Audio(RINGTONE_SOUND));
@@ -99,10 +111,9 @@ function PersonalChat({ userData, socket }) {
   const typingTimeoutRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  // 📝 LOGGING FUNCTION
   const addLog = (msg) => {
       console.log(msg);
-      setLogs(prev => [...prev.slice(-4), msg]); // Keep last 5 logs
+      setLogs(prev => [...prev.slice(-4), msg]); 
   };
 
   useEffect(() => {
@@ -129,7 +140,7 @@ function PersonalChat({ userData, socket }) {
 
        socket.on("callAccepted", (signal) => {
            setCallStatus("connected");
-           addLog("✅ Call Accepted by User");
+           addLog("✅ Call Accepted");
            if(connectionRef.current) connectionRef.current.signal(signal);
        });
 
@@ -138,7 +149,7 @@ function PersonalChat({ userData, socket }) {
        return () => { 
            unsubscribe(); 
            socket.off("callUser"); 
-           socket.off("callAccepted");
+           socket.off("callAccepted"); 
            socket.off("callEnded");
        };
     }
@@ -147,13 +158,13 @@ function PersonalChat({ userData, socket }) {
   const forceAudioPlay = () => {
       if(userAudio.current) {
           userAudio.current.play()
-             .then(() => addLog("🔊 Force Play Success"))
-             .catch(e => addLog("❌ Force Play Failed: " + e.message));
+             .then(() => addLog("🔊 Audio Force Started"))
+             .catch(e => addLog("❌ Force Failed: " + e.message));
       }
   };
 
   const createPeer = (initiator, stream) => {
-      addLog(`🛠 Creating Peer (Initiator: ${initiator})`);
+      addLog(`🛠 Init Peer (Init: ${initiator})`);
       const peer = new Peer({ 
           initiator: initiator, 
           trickle: false, 
@@ -162,56 +173,46 @@ function PersonalChat({ userData, socket }) {
       });
 
       peer.on("signal", (data) => {
-          addLog("📡 Signal Generated");
           if(initiator) socket.emit("callUser", { userToCall: roomId, signalData: data, from: userData.uid, name: userData.realName });
           else socket.emit("answerCall", { signal: data, to: roomId });
       });
 
-      peer.on("connect", () => {
-          addLog("🤝 P2P Connection Established!");
-      });
-
       peer.on("stream", (remoteStream) => {
-          addLog("🌊 Remote Stream Received!");
-          addLog(`Tracks: ${remoteStream.getAudioTracks().length}`);
-          
+          addLog("🌊 Stream Received!");
           if (userAudio.current) {
               userAudio.current.srcObject = remoteStream;
-              userAudio.current.play().catch(e => addLog("⚠️ Auto-Play Blocked: " + e.message));
+              userAudio.current.play().catch(e => addLog("⚠️ Autoplay blocked"));
           }
       });
 
-      peer.on("error", (err) => {
-          addLog("❌ Peer Error: " + err.message);
-      });
-
+      peer.on("error", (err) => addLog("❌ Peer Error: " + err.message));
       return peer;
   };
 
   const callUser = () => {
       setCallStatus("calling");
-      setLogs([]); // Clear logs
+      setLogs([]); 
       navigator.mediaDevices.getUserMedia({ video: false, audio: true }).then((stream) => {
-          addLog("🎤 Mic Access Granted");
+          addLog("🎤 Mic ON");
           connectionRef.current = createPeer(true, stream);
       }).catch(err => {
-          addLog("❌ Mic Error: " + err.message);
-          alert("Microphone Access Denied. Check Browser Settings.");
+          addLog("❌ Mic Fail: " + err.message);
+          alert("Check Mic Permissions");
           setCallStatus("idle");
       });
   };
 
   const answerCall = () => {
       setCallStatus("connected");
-      setLogs([]); // Clear logs
+      setLogs([]); 
       ringtoneAudio.current.pause();
       
       navigator.mediaDevices.getUserMedia({ video: false, audio: true }).then((stream) => {
-          addLog("🎤 Mic Access Granted");
+          addLog("🎤 Mic ON");
           const peer = createPeer(false, stream);
           peer.signal(callerSignal);
           connectionRef.current = peer;
-      }).catch(err => addLog("❌ Mic Error: " + err.message));
+      }).catch(err => addLog("❌ Mic Fail: " + err.message));
   };
 
   const leaveCall = () => {
@@ -222,7 +223,7 @@ function PersonalChat({ userData, socket }) {
       window.location.reload(); 
   };
 
-  // ... (Keep sendMessage, handleTyping, handleFileSelect from before) ...
+  // ... (Keep handleFileSelect, sendMessage, handleTyping) ...
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -324,10 +325,10 @@ function PersonalChat({ userData, socket }) {
             <button onClick={() => sendMessage()} className="bg-blue-600 w-12 h-12 rounded-full text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform hover:bg-blue-500"><span className="-ml-0.5 text-lg">➤</span></button>
         </div>
 
-        {/* 📞 CALL MODAL WITH DEBUG */}
+        {/* 📞 CALL MODAL */}
         <CallModal callStatus={callStatus} otherUser={otherUser} onAnswer={answerCall} onReject={leaveCall} onEnd={leaveCall} debugLogs={logs} onForceAudio={forceAudioPlay} />
         
-        {/* 🔈 REMOTE AUDIO (Hidden but active) */}
+        {/* 🔈 REMOTE AUDIO */}
         <audio ref={userAudio} autoPlay playsInline controls={false} />
 
         <style>{`
