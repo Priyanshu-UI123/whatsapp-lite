@@ -94,14 +94,14 @@ function PersonalChat({ userData, socket }) {
   const userAudio = useRef(); 
   const connectionRef = useRef();
   
-  // 🛠️ REFS FOR SCROLL & SOUND FIXES
+  // 🛠️ REFS
   const bottomRef = useRef(null);
-  const scrollContainerRef = useRef(null); // Ref for the chat container
-  const lastMessageIdRef = useRef(null);    // Track last played message to stop repeating sound
+  const scrollContainerRef = useRef(null); 
+  const lastMessageIdRef = useRef(null);    
   const typingTimeoutRef = useRef(null);
   const fileInputRef = useRef(null);
+  const prevMessageListLength = useRef(0); // Track length to avoid scrolling on status updates
 
-  // 1. SETUP & LISTENERS
   useEffect(() => {
     if (userData && roomId) {
        socket.emit("setup", userData);
@@ -122,9 +122,9 @@ function PersonalChat({ userData, socket }) {
            if (msgs.length > 0) {
                const lastMsg = msgs[msgs.length - 1];
                
-               // 🎵 SOUND FIX: Only play if the Message ID is NEW
+               // 🎵 SOUND FIX: Strict check for NEW message ID
                if (lastMsg.id !== lastMessageIdRef.current) {
-                   lastMessageIdRef.current = lastMsg.id; // Mark as played
+                   lastMessageIdRef.current = lastMsg.id; 
                    
                    const isMyMessage = lastMsg.uid ? (lastMsg.uid === userData.uid) : (lastMsg.author === userData.realName);
                    if (!isMyMessage) {
@@ -135,7 +135,6 @@ function PersonalChat({ userData, socket }) {
            }
        });
 
-       // Call listeners (kept same)
        socket.off("callUser"); 
        socket.on("callUser", (data) => {
            if (data.from === userData.uid) return;
@@ -168,18 +167,27 @@ function PersonalChat({ userData, socket }) {
     }
   }, [roomId, userData, otherUser]);
 
-  // 📜 SMART AUTO-SCROLL FIX
+  // 📜 THE "PEACEFUL SCROLL" LOGIC
+  // Only scroll down IF: 
+  // 1. It is the FIRST load (length was 0).
+  // 2. We received a NEW message (length increased) AND user was already near bottom.
   useLayoutEffect(() => {
       const container = scrollContainerRef.current;
-      if (container) {
-          // Logic: Only auto-scroll if user is already near bottom OR it's the very first load
-          const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+      const currentLength = messageList.length;
+      const prevLength = prevMessageListLength.current;
+
+      if (container && currentLength > prevLength) {
+          // Check if user is currently looking at the bottom
+          const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
           
-          if (isNearBottom || messageList.length < 10) {
+          // Force scroll only on initial load OR if user is already at the bottom
+          if (prevLength === 0 || isNearBottom) {
               bottomRef.current?.scrollIntoView({ behavior: "smooth" });
           }
       }
-  }, [messageList, typingUser]);
+      
+      prevMessageListLength.current = currentLength;
+  }, [messageList]); // Trigger on list update, but logic inside prevents forced scrolling
 
   const forceAudioPlay = () => {
       if(userAudio.current) {
@@ -281,6 +289,9 @@ function PersonalChat({ userData, socket }) {
     if (type === "text") setCurrentMessage("");
     setShowEmoji(false);
     socket.emit("stop_typing", roomId);
+    
+    // ⬇️ ALWAYS SCROLL DOWN WHEN I SEND
+    setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   };
 
   const handleTyping = (e) => {
