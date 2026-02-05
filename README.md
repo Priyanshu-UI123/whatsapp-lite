@@ -44,10 +44,15 @@ A premium, real-time messaging application built with **React** and **Firebase**
 4. **Code snippet**
 
  VITE_API_KEY=your_api_key
+
  VITE_AUTH_DOMAIN=your_project_id.firebaseapp.com
+
  VITE_PROJECT_ID=your_project_id
+
  VITE_STORAGE_BUCKET=your_project_id.firebasestorage.app
+
  VITE_MESSAGING_SENDER_ID=your_sender_id
+ 
  VITE_APP_ID=your_app_id
 
 5. **Run the App**
