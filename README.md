@@ -1,118 +1,66 @@
-# 🚀 WhatsApp Lite
+![WhatsApp Lite Banner](https://via.placeholder.com/1000x300/0f172a/10b981?text=WhatsApp+Lite)
 
-> A premium, real-time messaging application featuring a stunning Glassmorphism UI, seamless animations, and instant connectivity. Built with **React** and **Firebase**.
+# WhatsApp Lite
 
-![Project Banner](https://via.placeholder.com/1200x600/0f172a/10b981?text=WhatsApp+Lite+Preview)
+A premium, real-time messaging application built with **React** and **Firebase**. It features a modern Glassmorphism UI, seamless animations, and instant connectivity.
+
+---
 
 ## ✨ Features
 
-### 💬 Messaging
-- **Real-time Chat:** Instant message delivery using Firestore live listeners.
-- **Direct Messages (DM):** Private 1-on-1 chats with "Read Receipts" (✓✓).
-- **Group Chats:** Open public rooms with active member lists.
-- **Image Sharing:** Send compressed images instantly (Base64 architecture - No storage bucket required).
-- **Typing Indicators:** See when others are typing in real-time.
-
-### 🔐 Authentication & Security
-- **Google Login:** One-click sign-in.
-- **Email/Password:** Secure registration system.
-- **Persistent Sessions:** Stays logged in even after refresh.
-
-### 🎨 UI/UX Design
-- **Glassmorphism:** Premium frosted glass aesthetics.
-- **Cinematic Animations:** Grand entrance reveals, floating backgrounds, and smooth transitions.
-- **Fully Responsive:** Optimized layouts for both Desktop and Mobile (Custom bottom navigation for mobile).
-- **Interactive Profile:** Update display name, bio, and profile picture.
-
----
+- **Real-time Messaging:** Instant chat with zero latency using Firestore listeners.
+- **Private & Group Chats:** Support for both 1-on-1 DMs and public chat rooms.
+- **Media Support:** Send images directly in the chat.
+- **Modern UI:** stunning Glassmorphism design with smooth entry animations.
+- **Fully Responsive:** Works perfectly on Desktop and Mobile (with custom mobile navigation).
+- **Secure Auth:** Google Sign-In and Email/Password authentication.
 
 ## 🛠️ Tech Stack
 
-**Frontend:**
-- [React.js](https://reactjs.org/) (Vite)
-- [Tailwind CSS](https://tailwindcss.com/) (Styling)
-- [Framer Motion / CSS Animations](https://www.framer.com/motion/)
-- [React Router DOM](https://reactrouter.com/)
+- **Frontend:** React.js, Tailwind CSS, Framer Motion
+- **Backend:** Firebase Authentication, Firestore Database
+- **Routing:** React Router DOM
 
-**Backend / Services:**
-- [Firebase Auth](https://firebase.google.com/docs/auth) (Authentication)
-- [Firebase Firestore](https://firebase.google.com/docs/firestore) (Real-time Database)
-- [Socket.io-client](https://socket.io/) (Signaling & Typing status)
+## 🚀 Installation & Setup
 
----
+1. **Clone the repository**
+   ```bash
+   git clone [https://github.com/your-username/whatsapp-lite.git](https://github.com/your-username/whatsapp-lite.git)
+   cd whatsapp-lite
+   
+2. **Install Dependencies**
 
-## 🚀 Getting Started
+   ```bash
+   npm install
 
-Follow these steps to run the project locally.
+3. **Configure Firebase**
 
-### 1. Clone the Repository
-```bash
-git clone [https://github.com/your-username/whatsapp-lite.git](https://github.com/your-username/whatsapp-lite.git)
-cd whatsapp-lite
+   Create a project at Firebase Console.
 
-2. Install Dependencies
-Bash
-npm install
-3. Configure Firebase
-Go to Firebase Console.
+   Enable Authentication and Firestore Database.
 
-Create a new project.
+   Create a .env file in the root folder and add your API keys:
 
-Enable Authentication (Google & Email/Password).
+4. **Code snippet**
 
-Enable Cloud Firestore (Create database in test mode).
+ VITE_API_KEY=your_api_key
+ VITE_AUTH_DOMAIN=your_project_id.firebaseapp.com
+ VITE_PROJECT_ID=your_project_id
+ VITE_STORAGE_BUCKET=your_project_id.firebasestorage.app
+ VITE_MESSAGING_SENDER_ID=your_sender_id
+ VITE_APP_ID=your_app_id
 
-Copy your Firebase config keys.
+5. **Run the App**
 
-4. Setup Environment Variables
-Create a .env file in the root directory and add your Firebase keys:
+   ```bash
+   npm run dev
 
-Code snippet
-VITE_API_KEY=your_api_key
-VITE_AUTH_DOMAIN=your_project_id.firebaseapp.com
-VITE_PROJECT_ID=your_project_id
-VITE_STORAGE_BUCKET=your_project_id.firebasestorage.app
-VITE_MESSAGING_SENDER_ID=your_sender_id
-VITE_APP_ID=your_app_id
-5. Run the App
-Bash
-npm run dev
-Open http://localhost:5173 to view it in the browser.
+**👨‍💻 Author**
 
-📂 Project Structure
-Bash
-frontend/
-├── src/
-│   ├── components/      # Reusable UI components
-│   ├── pages/
-│   │   ├── Home.jsx         # Dashboard & Chat List
-│   │   ├── Login.jsx        # Auth Page
-│   │   ├── Signup.jsx       # Registration Page
-│   │   ├── PersonalChat.jsx # 1-on-1 Chat Logic
-│   │   ├── GroupChat.jsx    # Group Room Logic
-│   │   ├── Profile.jsx      # User Settings
-│   │   └── About.jsx        # Developer Info
-│   ├── firebase.js      # Firebase Configuration
-│   ├── socket.js        # Socket Connection
-│   ├── App.jsx          # Routing & Auth State
-│   └── index.css        # Global Styles & Animations
-🛡️ Database Rules (Firestore)
-Ensure your Firestore rules allow reads/writes for authenticated users:
+   Priyansu Dash
 
-JavaScript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-  }
-}
-👨‍💻 Developer
-Priyansu Dash Full Stack Developer & Architect
+   Role: Full Stack Developer
 
-📧 Contact: pupuhari123@gmail.com
+   Email: pupuhari123@gmail.com
 
-💻 GitHub: YourGitHubProfile
-
-<p align="center"> Crafted with 💙 and lots of caffeine. </p>
+Crafted with 💙 by Priyansu.
