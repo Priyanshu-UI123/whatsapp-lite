@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import EmojiPicker from "emoji-picker-react";
 import { db } from "../firebase";
 import { 
   doc, getDoc, setDoc, updateDoc, serverTimestamp, 
@@ -28,14 +27,20 @@ const ProfileModal = ({ user, onClose }) => {
   );
 };
 
-// ... (Helper functions like Linkify, formatDate, MessageStatus, TypingIndicator remain same as previous Chat.jsx) ...
-// For brevity, I'm assuming you can copy the helper functions from the previous Chat.jsx or I can provide them if needed. 
-// Let's assume standard helpers are here.
-const formatDate = (d) => new Date(d).toLocaleDateString();
-const Linkify = ({text}) => <span>{text}</span>; // Placeholder, use real one
-const MessageStatus = ({ status, isMyMessage }) => isMyMessage ? <span className="text-[10px] ml-1 text-cyan-400">✓✓</span> : null;
-const TypingIndicator = () => <div className="text-gray-500 text-xs ml-4 animate-pulse">Typing...</div>;
+const MessageStatus = ({ status, isMyMessage }) => {
+  if (!isMyMessage) return null;
+  if (status === "sent") return <span className="text-white/40 text-[10px] ml-1">✓</span>;
+  if (status === "read") return <span className="text-cyan-400 text-[10px] ml-1">✓✓</span>;
+  return <span className="text-white/40 text-[10px] ml-1">✓</span>; 
+};
 
+const TypingIndicator = () => (
+    <div className="flex items-center gap-1 bg-white/5 p-3 rounded-2xl rounded-tl-none w-fit mb-4 ml-4 border border-white/5">
+      <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></div>
+      <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
+      <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.4s" }}></div>
+    </div>
+);
 
 function PersonalChat({ userData, socket }) {
   const { roomId } = useParams();
@@ -46,7 +51,6 @@ function PersonalChat({ userData, socket }) {
   const [typingUser, setTypingUser] = useState("");
   const [otherUser, setOtherUser] = useState(null); 
   const [showProfile, setShowProfile] = useState(false);
-  const [showEmoji, setShowEmoji] = useState(false);
   
   const notificationAudio = useRef(new Audio(NOTIFICATION_SOUND));
   const bottomRef = useRef(null);
@@ -110,8 +114,7 @@ function PersonalChat({ userData, socket }) {
 
     await addDoc(collection(db, "chats", roomId, "messages"), messageData);
     
-    // Update Recent Chats (Logic same as before, simplified for brevity)
-    // ... Copy updateRecentChats logic here ...
+    // Update Recent Chats
     const ids = roomId.split("_");
     const otherUid = ids[0] === userData.uid ? ids[1] : ids[0];
     
@@ -127,7 +130,6 @@ function PersonalChat({ userData, socket }) {
     }}, { merge: true });
 
     setCurrentMessage("");
-    setShowEmoji(false);
     socket.emit("stop_typing", roomId);
   };
 
@@ -141,29 +143,31 @@ function PersonalChat({ userData, socket }) {
   if (!userData) return <div className="h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
 
   return (
-    <div className="w-full h-[100dvh] bg-[#0b0f19] flex flex-col font-sans overflow-hidden">
+    // ✅ FIXED LAYOUT FOR MOBILE
+    <div className="fixed inset-0 bg-[#0b0f19] flex flex-col font-sans">
+        
         {/* HEADER */}
-        <div className="h-16 bg-black/40 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-30 shadow-sm shrink-0">
-            <div className="flex items-center gap-4">
-                <button onClick={() => navigate("/")} className="text-gray-400 hover:text-white transition p-2">←</button>
+        <div className="h-14 md:h-16 bg-black/40 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-4 z-30 shrink-0">
+            <div className="flex items-center gap-3">
+                <button onClick={() => navigate("/")} className="text-gray-300 text-xl p-2 hover:bg-white/5 rounded-full">←</button>
                 <div className="flex items-center gap-3 cursor-pointer" onClick={() => setShowProfile(true)}>
-                    <img src={otherUser?.photoURL} className="w-10 h-10 rounded-xl object-cover border border-white/10" />
+                    <img src={otherUser?.photoURL} className="w-9 h-9 md:w-10 md:h-10 rounded-full object-cover border border-white/10" />
                     <div>
-                        <h2 className="font-bold text-white text-lg">{otherUser?.realName || "User"}</h2>
-                        <p className="text-xs text-gray-400">{typingUser ? "Typing..." : "Encrypted"}</p>
+                        <h2 className="font-bold text-white text-sm md:text-lg">{otherUser?.realName || "User"}</h2>
+                        <p className="text-[10px] md:text-xs text-gray-400">{typingUser ? "Typing..." : "Encrypted Connection"}</p>
                     </div>
                 </div>
             </div>
-            <button onClick={() => navigate("/")} className="text-xs px-3 py-2 rounded-lg bg-blue-900/20 text-blue-300">Dashboard</button>
+            <button onClick={() => navigate("/")} className="text-[10px] md:text-xs px-3 py-2 rounded-lg bg-blue-900/20 text-blue-300 border border-blue-500/20">Dashboard</button>
         </div>
 
-        {/* MESSAGES */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
+        {/* MESSAGES - Added padding bottom (pb-24) so last message isn't hidden behind input */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-2 pb-24 custom-scrollbar">
             {messageList.map((msg, idx) => {
                 const isMe = msg.author === userData.realName;
                 return (
                     <div key={idx} className={`flex w-full ${isMe ? "justify-end" : "justify-start"}`}>
-                        <div className={`max-w-[70%] px-4 py-2 rounded-xl text-sm ${isMe ? "bg-blue-600 text-white" : "bg-white/10 text-gray-200"}`}>
+                        <div className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm ${isMe ? "bg-blue-600 text-white rounded-br-none" : "bg-white/10 text-gray-200 rounded-bl-none"}`}>
                             <p>{msg.message}</p>
                             <div className="flex justify-end gap-1 mt-1 opacity-70 text-[10px]">
                                 <span>{msg.time}</span>
@@ -177,15 +181,23 @@ function PersonalChat({ userData, socket }) {
             <div ref={bottomRef} />
         </div>
 
-        {/* INPUT */}
-        <div className="p-3 bg-black/60 backdrop-blur-md flex gap-2">
-            <input className="flex-1 bg-white/5 text-white p-3 rounded-full outline-none" 
+        {/* INPUT - Fixed to bottom with safe-area support */}
+        <div className="fixed bottom-0 left-0 w-full bg-[#0b0f19] border-t border-white/10 p-3 flex gap-2 z-40 pb-safe">
+            <input className="flex-1 bg-white/5 text-white p-3 rounded-full outline-none text-sm border border-white/5 focus:border-blue-500/50 transition-all placeholder-gray-500" 
                 placeholder="Type a message..." value={currentMessage} onChange={handleTyping} 
                 onKeyPress={(e) => e.key === "Enter" && sendMessage()} />
-            <button onClick={sendMessage} className="bg-blue-600 p-3 rounded-full text-white">➤</button>
+            <button onClick={sendMessage} className="bg-blue-600 w-12 h-12 rounded-full text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform hover:bg-blue-500">
+                <span className="-ml-0.5 text-lg">➤</span>
+            </button>
         </div>
 
         {showProfile && <ProfileModal user={otherUser} onClose={() => setShowProfile(false)} />}
+
+        <style>{`
+            .pb-safe { padding-bottom: env(safe-area-inset-bottom); } 
+            /* Fix for iOS Scroll Bounce showing white background */
+            body { background-color: #0b0f19; }
+        `}</style>
     </div>
   );
 }

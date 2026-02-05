@@ -4,25 +4,78 @@ import { collection, query, where, getDocs, doc, onSnapshot, updateDoc } from "f
 import { db, auth } from "../firebase";
 import { signOut } from "firebase/auth";
 
+// 📱 MOBILE ACTION MODAL
+const MobileActions = ({ onClose, onJoin, onSearch, userData }) => {
+    const [tab, setTab] = useState("search"); // 'search' or 'join'
+    const [queryTxt, setQueryTxt] = useState("");
+    const [roomTxt, setRoomTxt] = useState("");
+    const [result, setResult] = useState(null);
+
+    const handleSearch = async () => {
+        if(!queryTxt) return;
+        const q = query(collection(db, "users"), where("username", "==", queryTxt.toLowerCase()));
+        const snap = await getDocs(q);
+        if(!snap.empty) setResult(snap.docs[0].data());
+        else alert("User not found");
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center animate-fade-in">
+            <div className="bg-[#1e293b] w-full sm:w-96 rounded-t-2xl sm:rounded-2xl p-6 border-t sm:border border-white/10 shadow-2xl">
+                <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-white font-bold text-lg">New Chat</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
+                </div>
+
+                <div className="flex bg-black/20 p-1 rounded-xl mb-6">
+                    <button onClick={() => setTab("search")} className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${tab==="search" ? "bg-emerald-600 text-white shadow-lg" : "text-gray-400"}`}>Private DM</button>
+                    <button onClick={() => setTab("join")} className={`flex-1 py-2 rounded-lg text-sm font-bold transition ${tab==="join" ? "bg-blue-600 text-white shadow-lg" : "text-gray-400"}`}>Group Chat</button>
+                </div>
+
+                {tab === "search" ? (
+                    <div className="space-y-4">
+                        <div className="flex gap-2">
+                            <input type="text" placeholder="Username..." className="flex-1 bg-black/30 text-white p-3 rounded-xl outline-none border border-white/10"
+                                onChange={(e)=>setQueryTxt(e.target.value)} />
+                            <button onClick={handleSearch} className="bg-emerald-600 p-3 rounded-xl text-white">🔍</button>
+                        </div>
+                        {result && (
+                            <div onClick={() => onSearch(result)} className="bg-white/5 p-3 rounded-xl flex items-center gap-3 cursor-pointer border border-emerald-500/50">
+                                <img src={result.photoURL} className="w-10 h-10 rounded-full"/>
+                                <div><p className="text-white font-bold">{result.realName}</p><p className="text-xs text-gray-400">@{result.username}</p></div>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                         <input type="text" placeholder="Enter Room ID..." className="w-full bg-black/30 text-white p-3 rounded-xl outline-none border border-white/10"
+                                onChange={(e)=>setRoomTxt(e.target.value)} />
+                         <button onClick={() => onJoin(roomTxt)} className="w-full bg-blue-600 py-3 rounded-xl text-white font-bold shadow-lg">Join Room</button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 function Home({ userData, socket }) {
-  if (!userData) return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-emerald-400 font-bold animate-pulse">Loading Profile...</div>;
+  if (!userData) return <div className="min-h-screen bg-gray-900 flex items-center justify-center text-emerald-400 font-bold animate-pulse">Loading...</div>;
 
   const navigate = useNavigate();
+  const [chats, setChats] = useState([]);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  
+  // Desktop States
   const [room, setRoom] = useState("");
   const [searchUsername, setSearchUsername] = useState("");
   const [searchResult, setSearchResult] = useState(null);
-  const [searchError, setSearchError] = useState("");
-  const [chats, setChats] = useState([]);
 
-  // 1. LISTEN TO RECENT CHATS
   useEffect(() => {
     if (userData.uid) {
       const unsub = onSnapshot(doc(db, "userChats", userData.uid), (doc) => {
         if (doc.exists()) {
            const data = doc.data();
-           const chatList = Object.entries(data).map(([roomId, chatData]) => ({
-              roomId, ...chatData
-           })).sort((a,b) => b.date - a.date);
+           const chatList = Object.entries(data).map(([roomId, chatData]) => ({ roomId, ...chatData })).sort((a,b) => b.date - a.date);
            setChats(chatList);
         }
       });
@@ -32,199 +85,130 @@ function Home({ userData, socket }) {
 
   const handleLogout = async () => { await signOut(auth); };
 
-  const joinRoom = () => {
-    if (room !== "") {
-      socket.emit("join_room", { room, username: userData.realName, photo: userData.photoURL });
-      // ✅ NAVIGATE TO GROUP PAGE
-      navigate(`/group/${room}`);
+  const joinRoom = (roomID) => {
+    if (roomID) {
+      socket.emit("join_room", { room: roomID, username: userData.realName, photo: userData.photoURL });
+      navigate(`/group/${roomID}`);
     }
   };
 
-  const handleSearchUser = async () => {
-    setSearchResult(null);
-    setSearchError("");
-    if(!searchUsername) return;
-    try {
-      const q = query(collection(db, "users"), where("username", "==", searchUsername.toLowerCase()));
-      const querySnapshot = await getDocs(q);
-      if (querySnapshot.empty) setSearchError("User not found!");
-      else setSearchResult(querySnapshot.docs[0].data());
-    } catch (err) { setSearchError("Error searching."); }
-  };
-
-  const startDirectChat = () => {
-    if (searchResult) {
+  const startDirectChat = (targetUser) => {
+    if (targetUser) {
       const myUid = userData.uid;
-      const theirUid = searchResult.uid;
+      const theirUid = targetUser.uid;
       const roomID = myUid < theirUid ? `${myUid}_${theirUid}` : `${theirUid}_${myUid}`;
       socket.emit("join_room", { room: roomID, username: userData.realName, photo: userData.photoURL });
-      // ✅ NAVIGATE TO DM PAGE
       navigate(`/dm/${roomID}`);
     }
   };
 
-  // ✅ CLEAR UNREAD STATUS & NAVIGATE CORRECTLY
+  const handleDesktopSearch = async () => {
+    if(!searchUsername) return;
+    const q = query(collection(db, "users"), where("username", "==", searchUsername.toLowerCase()));
+    const snap = await getDocs(q);
+    if(!snap.empty) setSearchResult(snap.docs[0].data());
+  };
+
   const openRecentChat = async (chat) => {
-      // 1. Mark as Read in Database
-      const chatRef = doc(db, "userChats", userData.uid);
-      try {
-          await updateDoc(chatRef, { [`${chat.roomId}.unread`]: false });
-      } catch (e) { console.log("Error marking read:", e); }
-
-      // 2. Join Socket
+      try { await updateDoc(doc(db, "userChats", userData.uid), { [`${chat.roomId}.unread`]: false }); } catch (e) {}
       socket.emit("join_room", { room: chat.roomId, username: userData.realName, photo: userData.photoURL });
-
-      // 3. ✅ NAVIGATE BASED ON ID TYPE
-      if (chat.roomId.includes("_")) {
-          navigate(`/dm/${chat.roomId}`);
-      } else {
-          navigate(`/group/${chat.roomId}`);
-      }
+      if (chat.roomId.includes("_")) navigate(`/dm/${chat.roomId}`);
+      else navigate(`/group/${chat.roomId}`);
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center font-sans relative overflow-hidden">
+    <div className="h-[100dvh] bg-[#0f172a] flex items-center justify-center font-sans overflow-hidden">
       
-      {/* 🔮 BACKGROUND */}
-      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-600 rounded-full mix-blend-multiply filter blur-[128px] opacity-40 animate-blob"></div>
-      <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-emerald-500 rounded-full mix-blend-multiply filter blur-[128px] opacity-40 animate-blob animation-delay-2000"></div>
+      {/* BACKGROUND */}
+      <div className="fixed inset-0 bg-gradient-to-br from-gray-900 to-black z-0"></div>
 
-      {/* 📦 CONTAINER */}
-      <div className="w-full max-w-5xl h-[90vh] bg-gray-900/60 backdrop-blur-xl border border-white/10 rounded-3xl shadow-2xl flex overflow-hidden z-10 animate-fade-in-up">
+      {/* CONTAINER */}
+      <div className="w-full md:max-w-5xl h-full md:h-[90vh] bg-gray-900/60 md:backdrop-blur-xl md:border border-white/10 md:rounded-3xl shadow-2xl flex relative z-10">
         
-        {/* 👈 LEFT SIDEBAR */}
-        <div className="w-full md:w-[350px] bg-black/20 border-r border-white/5 flex flex-col">
+        {/* 👈 LEFT SIDEBAR (VISIBLE ON MOBILE) */}
+        <div className="w-full md:w-[350px] bg-black/20 border-r border-white/5 flex flex-col h-full">
             
-            {/* Header with Profile Link */}
-            <div className="p-6 flex justify-between items-center border-b border-white/5 bg-white/5 backdrop-blur-sm">
-                <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate("/profile")}>
-                    <div className="relative">
-                        <img src={userData.photoURL} className="w-12 h-12 rounded-full border-2 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)] object-cover group-hover:scale-105 transition-transform" />
-                        <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                            <span className="text-xs">⚙️</span>
-                        </div>
-                    </div>
+            {/* Header */}
+            <div className="p-4 md:p-6 flex justify-between items-center border-b border-white/5 bg-white/5 backdrop-blur-sm shrink-0">
+                <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/profile")}>
+                    <img src={userData.photoURL} className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-emerald-500 object-cover" />
                     <div>
-                        <h2 className="text-white font-bold text-lg group-hover:text-emerald-400 transition-colors">{userData.realName}</h2>
-                        <p className="text-emerald-400 text-xs font-medium tracking-wide">ONLINE</p>
+                        <h2 className="text-white font-bold text-base md:text-lg">{userData.realName}</h2>
+                        <p className="text-emerald-400 text-[10px] md:text-xs font-medium tracking-wide">ONLINE</p>
                     </div>
                 </div>
                 
-                <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 transition p-2 rounded-full hover:bg-white/5">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                </button>
+                <div className="flex gap-2">
+                    {/* 📱 MOBILE PLUS BUTTON */}
+                    <button onClick={() => setShowMobileMenu(true)} className="md:hidden bg-emerald-600 text-white w-9 h-9 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/20 active:scale-90 transition">
+                        <span className="text-xl font-bold mb-0.5">+</span>
+                    </button>
+                    
+                    <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                    </button>
+                </div>
             </div>
 
-            {/* Recent Chats List */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2">
-                <h3 className="text-gray-500 text-xs font-bold uppercase tracking-wider mb-4 px-2">Recent Messages</h3>
-                
+            {/* Chats List */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
                 {chats.length === 0 && (
                     <div className="flex flex-col items-center justify-center h-40 text-gray-500 opacity-60">
-                        <p className="text-sm">No conversations yet.</p>
+                        <p className="text-sm">No chats yet.</p>
+                        <p className="text-xs">Tap + to start.</p>
                     </div>
                 )}
-
                 {chats.map((chat) => (
                     <div key={chat.roomId} onClick={() => openRecentChat(chat)} 
-                         className={`group flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all duration-300 border 
-                         ${chat.unread ? 'bg-white/10 border-emerald-500/50 shadow-[inset_0_0_15px_rgba(16,185,129,0.1)]' : 'hover:bg-white/10 border-transparent hover:border-white/5'}
-                         `}>
-                        
+                         className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border ${chat.unread ? 'bg-white/10 border-emerald-500/50' : 'border-transparent hover:bg-white/5'}`}>
                         <div className="relative">
-                            <img src={chat.userInfo.photoURL} className={`w-12 h-12 rounded-full object-cover transition-all ${chat.unread ? 'ring-2 ring-emerald-400 ring-offset-2 ring-offset-gray-900' : ''}`} />
+                            <img src={chat.userInfo.photoURL} className={`w-10 h-10 md:w-12 md:h-12 rounded-full object-cover ${chat.unread ? 'ring-2 ring-emerald-400' : ''}`} />
                             {chat.unread && <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-gray-900"></div>}
                         </div>
-
                         <div className="flex-1 min-w-0">
-                            <div className="flex justify-between items-center mb-1">
-                                <h4 className={`font-semibold text-sm truncate ${chat.unread ? 'text-white font-bold' : 'text-gray-300'}`}>{chat.userInfo.displayName}</h4>
+                            <div className="flex justify-between items-center mb-0.5">
+                                <h4 className={`font-semibold text-sm truncate ${chat.unread ? 'text-white' : 'text-gray-300'}`}>{chat.userInfo.displayName}</h4>
                                 <span className="text-[10px] text-gray-500">{new Date(chat.date?.seconds * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                             </div>
-                            <div className="flex justify-between items-center">
-                                <p className={`text-xs truncate ${chat.unread ? 'text-emerald-300 font-medium' : 'text-gray-400'}`}>{chat.lastMessage}</p>
-                                {chat.unread && <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_8px_#10b981]"></div>}
-                            </div>
+                            <p className={`text-xs truncate ${chat.unread ? 'text-emerald-300 font-medium' : 'text-gray-500'}`}>{chat.lastMessage}</p>
                         </div>
                     </div>
                 ))}
             </div>
         </div>
 
-        {/* 👉 RIGHT MAIN AREA */}
-        <div className="hidden md:flex flex-1 flex-col items-center justify-center relative">
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 z-0"></div>
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-900 via-gray-800 to-black z-[-1]"></div>
-
-            <div className="relative z-10 w-full max-w-md p-8">
-                <div className="text-center mb-10">
-                    <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500 mb-2 drop-shadow-lg">
-                        WhatsApp Lite
-                    </h1>
-                    <p className="text-gray-400 text-sm">Secure, Fast, and Elegant Messaging.</p>
+        {/* 👉 RIGHT MAIN AREA (DESKTOP ONLY) */}
+        <div className="hidden md:flex flex-1 flex-col items-center justify-center p-8">
+            <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500 mb-2">WhatsApp Lite</h1>
+            
+            {/* Desktop Search */}
+            <div className="bg-white/5 border border-white/10 p-6 rounded-2xl w-full max-w-md mt-8">
+                <h3 className="text-emerald-400 text-sm font-bold uppercase mb-4">Start Chat</h3>
+                <div className="flex gap-2 mb-4">
+                    <input type="text" placeholder="Username..." className="flex-1 bg-black/40 text-white p-3 rounded-lg outline-none" onChange={(e)=>setSearchUsername(e.target.value)}/>
+                    <button onClick={handleDesktopSearch} className="bg-emerald-600 px-4 rounded-lg font-bold">Find</button>
                 </div>
-
-                {/* SEARCH CARD */}
-                <div className="bg-white/5 backdrop-blur-md border border-white/10 p-6 rounded-2xl shadow-xl transition-all hover:border-emerald-500/30">
-                    <h3 className="text-emerald-400 text-sm font-bold uppercase mb-4 tracking-wider">Start a Conversation</h3>
-                    
-                    <div className="relative group">
-                        <input type="text" placeholder="Search by username..." 
-                            className="w-full bg-black/40 text-white p-4 pl-12 rounded-xl outline-none border border-white/10 focus:border-emerald-500 transition-all placeholder-gray-500"
-                            onChange={(e) => setSearchUsername(e.target.value)} value={searchUsername} 
-                        />
-                        <span className="absolute left-4 top-4 text-gray-400 group-focus-within:text-emerald-400 transition-colors">🔍</span>
-                        <button onClick={handleSearchUser} className="absolute right-2 top-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all shadow-lg hover:shadow-emerald-500/50">
-                            Find
-                        </button>
+                {searchResult && (
+                    <div onClick={() => startDirectChat(searchResult)} className="bg-white/10 p-2 rounded-lg flex items-center gap-3 cursor-pointer hover:bg-emerald-900/50">
+                        <img src={searchResult.photoURL} className="w-10 h-10 rounded-full"/>
+                        <p className="font-bold text-white">{searchResult.realName}</p>
                     </div>
-
-                    {searchError && <p className="text-red-400 text-xs mt-3 bg-red-500/10 p-2 rounded border border-red-500/20 text-center">{searchError}</p>}
-                    
-                    {searchResult && (
-                        <div onClick={startDirectChat} className="mt-4 bg-gradient-to-r from-gray-800 to-gray-900 p-3 rounded-xl flex items-center gap-4 cursor-pointer hover:from-emerald-900 hover:to-gray-900 border border-white/10 hover:border-emerald-500/50 transition-all group">
-                            <img src={searchResult.photoURL} className="w-12 h-12 rounded-full border-2 border-gray-700 group-hover:border-emerald-400 transition-colors" />
-                            <div>
-                                <p className="font-bold text-white group-hover:text-emerald-300 transition-colors">{searchResult.realName}</p>
-                                <p className="text-xs text-gray-500">@{searchResult.username}</p>
-                            </div>
-                            <span className="ml-auto text-emerald-500 text-sm opacity-0 group-hover:opacity-100 transition-opacity">Message →</span>
-                        </div>
-                    )}
-                </div>
-
-                <div className="flex items-center gap-4 my-8">
-                    <div className="h-[1px] bg-gradient-to-r from-transparent via-gray-600 to-transparent flex-1"></div>
-                    <span className="text-gray-500 text-xs font-mono">OR</span>
-                    <div className="h-[1px] bg-gradient-to-r from-transparent via-gray-600 to-transparent flex-1"></div>
-                </div>
-
-                <div className="relative group">
-                     <input type="text" placeholder="Enter Room ID to Join..." 
-                        className="w-full bg-black/40 text-white p-4 pl-4 rounded-xl outline-none border border-white/10 focus:border-blue-500 transition-all placeholder-gray-500"
-                        onChange={(e) => setRoom(e.target.value)} 
-                    />
-                    <button onClick={joinRoom} className="mt-3 w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white py-3 rounded-xl font-bold shadow-lg shadow-blue-900/30 transition-all transform hover:scale-[1.02] active:scale-[0.98]">
-                        Join Group Chat
-                    </button>
+                )}
+                <div className="my-6 border-t border-white/10"></div>
+                <div className="flex gap-2">
+                     <input type="text" placeholder="Room ID..." className="flex-1 bg-black/40 text-white p-3 rounded-lg outline-none" onChange={(e)=>setRoom(e.target.value)}/>
+                     <button onClick={() => joinRoom(room)} className="bg-blue-600 px-4 rounded-lg font-bold">Join</button>
                 </div>
             </div>
         </div>
       </div>
-      
+
+      {/* MOBILE MODAL */}
+      {showMobileMenu && <MobileActions onClose={() => setShowMobileMenu(false)} onJoin={joinRoom} onSearch={startDirectChat} />}
+
       <style>{`
-        @keyframes blob {
-          0% { transform: translate(0px, 0px) scale(1); }
-          33% { transform: translate(30px, -50px) scale(1.1); }
-          66% { transform: translate(-20px, 20px) scale(0.9); }
-          100% { transform: translate(0px, 0px) scale(1); }
-        }
-        .animate-blob { animation: blob 7s infinite; }
-        .animation-delay-2000 { animation-delay: 2s; }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { bg: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #10b981; }
+         .animate-fade-in { animation: fadeIn 0.2s ease-out; }
+         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
   );
