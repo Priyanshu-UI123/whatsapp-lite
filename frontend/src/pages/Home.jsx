@@ -6,7 +6,7 @@ import { signOut } from "firebase/auth";
 
 // 📱 MOBILE ACTION MODAL
 const MobileActions = ({ onClose, onJoin, onSearch, userData }) => {
-    const [tab, setTab] = useState("search"); // 'search' or 'join'
+    const [tab, setTab] = useState("search"); 
     const [queryTxt, setQueryTxt] = useState("");
     const [roomTxt, setRoomTxt] = useState("");
     const [result, setResult] = useState(null);
@@ -21,7 +21,7 @@ const MobileActions = ({ onClose, onJoin, onSearch, userData }) => {
 
     return (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center animate-fade-in">
-            <div className="bg-[#1e293b] w-full sm:w-96 rounded-t-2xl sm:rounded-2xl p-6 border-t sm:border border-white/10 shadow-2xl">
+            <div className="bg-[#1e293b] w-full sm:w-96 rounded-t-2xl sm:rounded-2xl p-6 border-t sm:border border-white/10 shadow-2xl animate-slide-up">
                 <div className="flex justify-between items-center mb-6">
                     <h3 className="text-white font-bold text-lg">New Chat</h3>
                     <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
@@ -33,21 +33,21 @@ const MobileActions = ({ onClose, onJoin, onSearch, userData }) => {
                 </div>
 
                 {tab === "search" ? (
-                    <div className="space-y-4">
+                    <div className="space-y-4 animate-fade-in">
                         <div className="flex gap-2">
                             <input type="text" placeholder="Username..." className="flex-1 bg-black/30 text-white p-3 rounded-xl outline-none border border-white/10"
                                 onChange={(e)=>setQueryTxt(e.target.value)} />
                             <button onClick={handleSearch} className="bg-emerald-600 p-3 rounded-xl text-white">🔍</button>
                         </div>
                         {result && (
-                            <div onClick={() => onSearch(result)} className="bg-white/5 p-3 rounded-xl flex items-center gap-3 cursor-pointer border border-emerald-500/50">
+                            <div onClick={() => onSearch(result)} className="bg-white/5 p-3 rounded-xl flex items-center gap-3 cursor-pointer border border-emerald-500/50 animate-pulse-once">
                                 <img src={result.photoURL} className="w-10 h-10 rounded-full"/>
                                 <div><p className="text-white font-bold">{result.realName}</p><p className="text-xs text-gray-400">@{result.username}</p></div>
                             </div>
                         )}
                     </div>
                 ) : (
-                    <div className="space-y-4">
+                    <div className="space-y-4 animate-fade-in">
                          <input type="text" placeholder="Enter Room ID..." className="w-full bg-black/30 text-white p-3 rounded-xl outline-none border border-white/10"
                                 onChange={(e)=>setRoomTxt(e.target.value)} />
                          <button onClick={() => onJoin(roomTxt)} className="w-full bg-blue-600 py-3 rounded-xl text-white font-bold shadow-lg">Join Room</button>
@@ -117,34 +117,43 @@ function Home({ userData, socket }) {
   };
 
   return (
-    <div className="h-[100dvh] bg-[#0f172a] flex items-center justify-center font-sans overflow-hidden">
+    <div className="h-[100dvh] bg-[#0f172a] flex items-center justify-center font-sans overflow-hidden relative">
       
-      {/* BACKGROUND */}
+      {/* 🔮 BACKGROUND ANIMATION */}
       <div className="fixed inset-0 bg-gradient-to-br from-gray-900 to-black z-0"></div>
+      <div className="fixed top-[-10%] left-[-10%] w-[500px] h-[500px] bg-purple-600/20 rounded-full blur-[100px] animate-float pointer-events-none"></div>
+      <div className="fixed bottom-[-10%] right-[-10%] w-[500px] h-[500px] bg-emerald-600/20 rounded-full blur-[100px] animate-float-delayed pointer-events-none"></div>
 
       {/* CONTAINER */}
-      <div className="w-full md:max-w-5xl h-full md:h-[90vh] bg-gray-900/60 md:backdrop-blur-xl md:border border-white/10 md:rounded-3xl shadow-2xl flex relative z-10">
+      <div className="w-full md:max-w-5xl h-full md:h-[90vh] bg-gray-900/60 md:backdrop-blur-xl md:border border-white/10 md:rounded-3xl shadow-2xl flex relative z-10 animate-scale-in">
         
         {/* 👈 LEFT SIDEBAR (VISIBLE ON MOBILE) */}
         <div className="w-full md:w-[350px] bg-black/20 border-r border-white/5 flex flex-col h-full">
             
             {/* Header */}
             <div className="p-4 md:p-6 flex justify-between items-center border-b border-white/5 bg-white/5 backdrop-blur-sm shrink-0">
-                <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate("/profile")}>
-                    <img src={userData.photoURL} className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-emerald-500 object-cover" />
+                <div className="flex items-center gap-3 cursor-pointer group" onClick={() => navigate("/profile")}>
+                    <img src={userData.photoURL} className="w-10 h-10 md:w-12 md:h-12 rounded-full border-2 border-emerald-500 object-cover group-hover:scale-105 transition-transform" />
                     <div>
-                        <h2 className="text-white font-bold text-base md:text-lg">{userData.realName}</h2>
+                        <h2 className="text-white font-bold text-base md:text-lg group-hover:text-emerald-400 transition-colors">{userData.realName}</h2>
                         <p className="text-emerald-400 text-[10px] md:text-xs font-medium tracking-wide">ONLINE</p>
                     </div>
                 </div>
                 
-                <div className="flex gap-2">
+                <div className="flex items-center gap-1">
+                    {/* ℹ️ ABOUT BUTTON */}
+                    <button onClick={() => navigate("/about")} className="text-gray-400 hover:text-white p-2 rounded-full hover:bg-white/5 transition" title="About App">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                        </svg>
+                    </button>
+
                     {/* 📱 MOBILE PLUS BUTTON */}
-                    <button onClick={() => setShowMobileMenu(true)} className="md:hidden bg-emerald-600 text-white w-9 h-9 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/20 active:scale-90 transition">
-                        <span className="text-xl font-bold mb-0.5">+</span>
+                    <button onClick={() => setShowMobileMenu(true)} className="md:hidden bg-emerald-600 text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg active:scale-90 transition ml-1">
+                        <span className="text-lg font-bold mb-0.5">+</span>
                     </button>
                     
-                    <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 p-2">
+                    <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 p-2 rounded-full hover:bg-white/5 transition" title="Logout">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                     </button>
                 </div>
@@ -153,18 +162,22 @@ function Home({ userData, socket }) {
             {/* Chats List */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
                 {chats.length === 0 && (
-                    <div className="flex flex-col items-center justify-center h-40 text-gray-500 opacity-60">
+                    <div className="flex flex-col items-center justify-center h-40 text-gray-500 opacity-60 animate-fade-in">
                         <p className="text-sm">No chats yet.</p>
                         <p className="text-xs">Tap + to start.</p>
                     </div>
                 )}
-                {chats.map((chat) => (
+                {chats.map((chat, idx) => (
                     <div key={chat.roomId} onClick={() => openRecentChat(chat)} 
-                         className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border ${chat.unread ? 'bg-white/10 border-emerald-500/50' : 'border-transparent hover:bg-white/5'}`}>
+                         style={{ animationDelay: `${idx * 50}ms` }}
+                         className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer border animate-slide-in-right 
+                         ${chat.unread ? 'bg-white/10 border-emerald-500/50' : 'border-transparent hover:bg-white/5 transition-colors'}`}>
+                        
                         <div className="relative">
                             <img src={chat.userInfo.photoURL} className={`w-10 h-10 md:w-12 md:h-12 rounded-full object-cover ${chat.unread ? 'ring-2 ring-emerald-400' : ''}`} />
-                            {chat.unread && <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-gray-900"></div>}
+                            {chat.unread && <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full border-2 border-gray-900 animate-pulse"></div>}
                         </div>
+                        
                         <div className="flex-1 min-w-0">
                             <div className="flex justify-between items-center mb-0.5">
                                 <h4 className={`font-semibold text-sm truncate ${chat.unread ? 'text-white' : 'text-gray-300'}`}>{chat.userInfo.displayName}</h4>
@@ -179,25 +192,36 @@ function Home({ userData, socket }) {
 
         {/* 👉 RIGHT MAIN AREA (DESKTOP ONLY) */}
         <div className="hidden md:flex flex-1 flex-col items-center justify-center p-8">
-            <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500 mb-2">WhatsApp Lite</h1>
+            <h1 className="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-cyan-500 mb-2 drop-shadow-lg animate-fade-in">WhatsApp Lite</h1>
+            <p className="text-gray-500 text-sm mb-8 animate-fade-in">Secure, Fast, and Elegant Messaging.</p>
             
             {/* Desktop Search */}
-            <div className="bg-white/5 border border-white/10 p-6 rounded-2xl w-full max-w-md mt-8">
-                <h3 className="text-emerald-400 text-sm font-bold uppercase mb-4">Start Chat</h3>
+            <div className="bg-white/5 border border-white/10 p-6 rounded-2xl w-full max-w-md animate-grand-reveal">
+                <h3 className="text-emerald-400 text-sm font-bold uppercase mb-4 tracking-wider">Start a Conversation</h3>
+                
                 <div className="flex gap-2 mb-4">
-                    <input type="text" placeholder="Username..." className="flex-1 bg-black/40 text-white p-3 rounded-lg outline-none" onChange={(e)=>setSearchUsername(e.target.value)}/>
-                    <button onClick={handleDesktopSearch} className="bg-emerald-600 px-4 rounded-lg font-bold">Find</button>
+                    <input type="text" placeholder="Username..." className="flex-1 bg-black/40 text-white p-3 rounded-lg outline-none border border-white/10 focus:border-emerald-500/50 transition-all" onChange={(e)=>setSearchUsername(e.target.value)}/>
+                    <button onClick={handleDesktopSearch} className="bg-emerald-600 hover:bg-emerald-500 px-4 rounded-lg font-bold transition-colors">Find</button>
                 </div>
+                
                 {searchResult && (
-                    <div onClick={() => startDirectChat(searchResult)} className="bg-white/10 p-2 rounded-lg flex items-center gap-3 cursor-pointer hover:bg-emerald-900/50">
+                    <div onClick={() => startDirectChat(searchResult)} className="bg-white/10 p-3 rounded-lg flex items-center gap-3 cursor-pointer hover:bg-emerald-900/30 border border-transparent hover:border-emerald-500/30 transition-all animate-pulse-once">
                         <img src={searchResult.photoURL} className="w-10 h-10 rounded-full"/>
-                        <p className="font-bold text-white">{searchResult.realName}</p>
+                        <div>
+                            <p className="font-bold text-white">{searchResult.realName}</p>
+                            <p className="text-xs text-gray-400">@{searchResult.username}</p>
+                        </div>
+                        <span className="ml-auto text-emerald-400 text-xs font-bold">Message →</span>
                     </div>
                 )}
-                <div className="my-6 border-t border-white/10"></div>
+                
+                <div className="my-6 border-t border-white/10 flex items-center justify-center">
+                    <span className="bg-[#131b2e] px-2 text-gray-500 text-xs -mt-2.5">OR</span>
+                </div>
+                
                 <div className="flex gap-2">
-                     <input type="text" placeholder="Room ID..." className="flex-1 bg-black/40 text-white p-3 rounded-lg outline-none" onChange={(e)=>setRoom(e.target.value)}/>
-                     <button onClick={() => joinRoom(room)} className="bg-blue-600 px-4 rounded-lg font-bold">Join</button>
+                     <input type="text" placeholder="Room ID..." className="flex-1 bg-black/40 text-white p-3 rounded-lg outline-none border border-white/10 focus:border-blue-500/50 transition-all" onChange={(e)=>setRoom(e.target.value)}/>
+                     <button onClick={() => joinRoom(room)} className="bg-blue-600 hover:bg-blue-500 px-4 rounded-lg font-bold transition-colors">Join</button>
                 </div>
             </div>
         </div>
@@ -207,8 +231,17 @@ function Home({ userData, socket }) {
       {showMobileMenu && <MobileActions onClose={() => setShowMobileMenu(false)} onJoin={joinRoom} onSearch={startDirectChat} />}
 
       <style>{`
-         .animate-fade-in { animation: fadeIn 0.2s ease-out; }
-         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+         .animate-fade-in { animation: fadeIn 0.5s ease-out forwards; }
+         .animate-slide-up { animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+         .animate-slide-in-right { animation: slideInRight 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+         .animate-scale-in { animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+         .animate-pulse-once { animation: pulseOnce 0.5s ease-out; }
+
+         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+         @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+         @keyframes slideInRight { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+         @keyframes scaleIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+         @keyframes pulseOnce { 0% { transform: scale(1); } 50% { transform: scale(1.02); } 100% { transform: scale(1); } }
       `}</style>
     </div>
   );
