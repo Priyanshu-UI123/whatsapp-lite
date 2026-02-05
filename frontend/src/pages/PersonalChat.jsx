@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import EmojiPicker from "emoji-picker-react"; // 😃 IMPORT EMOJI PICKER
 import { db } from "../firebase";
 import { 
   doc, getDoc, setDoc, updateDoc, serverTimestamp, 
@@ -51,11 +52,12 @@ function PersonalChat({ userData, socket }) {
   const [typingUser, setTypingUser] = useState("");
   const [otherUser, setOtherUser] = useState(null); 
   const [showProfile, setShowProfile] = useState(false);
+  const [showEmoji, setShowEmoji] = useState(false); // 😃 STATE FOR EMOJI
   
   const notificationAudio = useRef(new Audio(NOTIFICATION_SOUND));
   const bottomRef = useRef(null);
   const typingTimeoutRef = useRef(null);
-  const fileInputRef = useRef(null); // 📸 REF FOR FILE INPUT
+  const fileInputRef = useRef(null);
 
   // 1. SETUP
   useEffect(() => {
@@ -75,7 +77,6 @@ function PersonalChat({ userData, socket }) {
            
            if (msgs.length > 0) {
                const lastMsg = msgs[msgs.length - 1];
-               // Check using UID if available, fallback to author name
                const isMyMessage = lastMsg.uid ? (lastMsg.uid === userData.uid) : (lastMsg.author === userData.realName);
                
                if (!isMyMessage) {
@@ -111,7 +112,7 @@ function PersonalChat({ userData, socket }) {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = async () => {
-        await sendMessage(reader.result, "image"); // Send as Image Type
+        await sendMessage(reader.result, "image"); 
     };
   };
 
@@ -121,11 +122,11 @@ function PersonalChat({ userData, socket }) {
     const messageData = {
         room: roomId,
         author: userData.realName,
-        uid: userData.uid, // 🛡️ CRITICAL FIX: Save UID for reliable alignment
+        uid: userData.uid, 
         photo: userData.photoURL,
-        message: type === "text" ? content : "📷 Image", // Fallback text for sidebar
-        image: type === "image" ? content : null,        // Store Base64 here
-        type: type,                                      // 'text' or 'image'
+        message: type === "text" ? content : "📷 Image", 
+        image: type === "image" ? content : null,        
+        type: type,                                      
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         fullDate: new Date().toISOString(),
         createdAt: serverTimestamp(),
@@ -134,7 +135,6 @@ function PersonalChat({ userData, socket }) {
 
     await addDoc(collection(db, "chats", roomId, "messages"), messageData);
     
-    // Update Sidebar Logic
     const ids = roomId.split("_");
     const otherUid = ids[0] === userData.uid ? ids[1] : ids[0];
     
@@ -153,6 +153,7 @@ function PersonalChat({ userData, socket }) {
     }}, { merge: true });
 
     if (type === "text") setCurrentMessage("");
+    setShowEmoji(false); // Hide emoji picker after sending
     socket.emit("stop_typing", roomId);
   };
 
@@ -186,20 +187,15 @@ function PersonalChat({ userData, socket }) {
         {/* MESSAGES */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2 pb-24 custom-scrollbar">
             {messageList.map((msg, idx) => {
-                // 🛡️ FIX: Check UID first, fallback to name for old messages
                 const isMe = msg.uid ? (msg.uid === userData.uid) : (msg.author === userData.realName);
-                
                 return (
                     <div key={idx} className={`flex w-full ${isMe ? "justify-end" : "justify-start"}`}>
                         <div className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm ${isMe ? "bg-blue-600 text-white rounded-br-none" : "bg-white/10 text-gray-200 rounded-bl-none"}`}>
-                            
-                            {/* 🖼️ IMAGE MESSAGE */}
                             {msg.type === "image" ? (
                                 <img src={msg.image} className="w-full max-w-[200px] rounded-lg mb-1 border border-white/10" alt="sent" />
                             ) : (
                                 <p>{msg.message}</p>
                             )}
-
                             <div className="flex justify-end gap-1 mt-1 opacity-70 text-[10px]">
                                 <span>{msg.time}</span>
                                 <MessageStatus isMyMessage={isMe} status={msg.status} />
@@ -212,9 +208,22 @@ function PersonalChat({ userData, socket }) {
             <div ref={bottomRef} />
         </div>
 
-        {/* INPUT - With Paperclip */}
+        {/* INPUT */}
         <div className="fixed bottom-0 left-0 w-full bg-[#0b0f19] border-t border-white/10 p-3 flex gap-2 z-40 pb-safe">
             
+            {/* 😃 EMOJI POPUP */}
+            {showEmoji && (
+                <div className="absolute bottom-20 left-4 z-50 animate-fade-in-up shadow-2xl rounded-2xl overflow-hidden">
+                    <EmojiPicker 
+                        onEmojiClick={(e) => setCurrentMessage(prev => prev + e.emoji)} 
+                        theme="dark" 
+                        height={350} 
+                        searchDisabled 
+                        skinTonesDisabled
+                    />
+                </div>
+            )}
+
             {/* 📸 HIDDEN FILE INPUT */}
             <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileSelect} />
             
@@ -223,8 +232,13 @@ function PersonalChat({ userData, socket }) {
                 📎
             </button>
 
+            {/* 😃 EMOJI BUTTON */}
+            <button onClick={() => setShowEmoji(!showEmoji)} className="text-gray-400 hover:text-yellow-400 p-3 rounded-full hover:bg-white/5 transition">
+                😊
+            </button>
+
             <input className="flex-1 bg-white/5 text-white p-3 rounded-full outline-none text-sm border border-white/5 focus:border-blue-500/50 transition-all placeholder-gray-500" 
-                placeholder="Type a message..." value={currentMessage} onChange={handleTyping} 
+                placeholder="Type a message..." value={currentMessage} onChange={handleTyping} onClick={() => setShowEmoji(false)}
                 onKeyPress={(e) => e.key === "Enter" && sendMessage()} />
             
             <button onClick={() => sendMessage()} className="bg-blue-600 w-12 h-12 rounded-full text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform hover:bg-blue-500">
@@ -237,6 +251,8 @@ function PersonalChat({ userData, socket }) {
         <style>{`
             .pb-safe { padding-bottom: env(safe-area-inset-bottom); } 
             body { background-color: #0b0f19; }
+            .animate-fade-in-up { animation: fadeInUp 0.3s ease-out; }
+            @keyframes fadeInUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         `}</style>
     </div>
   );
