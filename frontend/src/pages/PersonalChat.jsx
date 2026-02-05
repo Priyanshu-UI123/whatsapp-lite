@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useLayoutEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import EmojiPicker from "emoji-picker-react";
 import Peer from "simple-peer"; 
@@ -16,17 +16,13 @@ const RINGTONE_SOUND = "https://assets.mixkit.co/active_storage/sfx/1359/1359-pr
 const CallModal = ({ callStatus, otherUser, incomingCaller, onAnswer, onReject, onEnd, onForceAudio }) => {
     if (callStatus === "idle") return null;
 
-    // 🎯 LOGIC: If incoming, show the Caller. If calling, show the person we are chatting with.
     const displayUser = callStatus === "incoming" ? incomingCaller : otherUser;
-    // Fallback if data is missing
     const displayName = displayUser?.realName || displayUser?.name || "Unknown User";
     const displayPhoto = displayUser?.photoURL || displayUser?.photo || "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
     return (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center animate-fade-in p-4">
             <div className="flex flex-col items-center gap-6 p-8 bg-[#1e293b] rounded-3xl border border-white/10 w-full max-w-sm shadow-2xl">
-                
-                {/* 👤 Avatar */}
                 <div className="relative">
                     <div className="absolute inset-0 bg-blue-500 rounded-full blur-xl animate-pulse"></div>
                     <img src={displayPhoto} className="relative w-28 h-28 rounded-full border-4 border-[#0f172a] object-cover z-10" />
@@ -39,7 +35,6 @@ const CallModal = ({ callStatus, otherUser, incomingCaller, onAnswer, onReject, 
                     {callStatus === "connected" && "Connected"}
                 </p>
 
-                {/* 🔊 FORCE AUDIO BUTTON */}
                 {callStatus === "connected" && (
                      <button onClick={onForceAudio} className="w-full bg-blue-600/20 text-blue-400 border border-blue-500/50 py-2 rounded-xl font-bold text-xs hover:bg-blue-600 hover:text-white transition">
                          🔊 Tap here if no sound
@@ -47,14 +42,11 @@ const CallModal = ({ callStatus, otherUser, incomingCaller, onAnswer, onReject, 
                 )}
 
                 <div className="flex items-center gap-8 mt-2">
-                    {/* 🟢 ANSWER BUTTON (Only show if Incoming) */}
                     {callStatus === "incoming" && (
                         <button onClick={onAnswer} className="w-16 h-16 shrink-0 bg-green-500 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition animate-bounce">
                             <span className="text-2xl">📞</span>
                         </button>
                     )}
-                    
-                    {/* 🔴 END BUTTON */}
                     <button onClick={callStatus === "incoming" ? onReject : onEnd} 
                         className="w-16 h-16 shrink-0 bg-red-500 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition hover:bg-red-600">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24" strokeWidth={0} stroke="currentColor" className="w-8 h-8">
@@ -95,19 +87,23 @@ function PersonalChat({ userData, socket }) {
   // 📞 CALL STATES
   const [callStatus, setCallStatus] = useState("idle"); 
   const [callerSignal, setCallerSignal] = useState(null);
-  const [incomingCaller, setIncomingCaller] = useState(null); // 🆕 Stores info about who is calling YOU
+  const [incomingCaller, setIncomingCaller] = useState(null);
   
   const notificationAudio = useRef(new Audio(NOTIFICATION_SOUND));
   const ringtoneAudio = useRef(new Audio(RINGTONE_SOUND));
   const userAudio = useRef(); 
   const connectionRef = useRef();
+  
+  // 🛠️ REFS FOR SCROLL & SOUND FIXES
   const bottomRef = useRef(null);
+  const scrollContainerRef = useRef(null); // Ref for the chat container
+  const lastMessageIdRef = useRef(null);    // Track last played message to stop repeating sound
   const typingTimeoutRef = useRef(null);
   const fileInputRef = useRef(null);
 
+  // 1. SETUP & LISTENERS
   useEffect(() => {
     if (userData && roomId) {
-       // 1. SETUP PRIVATE CHANNEL
        socket.emit("setup", userData);
        socket.emit("join_room", { room: roomId, username: userData.realName });
 
@@ -125,30 +121,29 @@ function PersonalChat({ userData, socket }) {
            
            if (msgs.length > 0) {
                const lastMsg = msgs[msgs.length - 1];
-               const isMyMessage = lastMsg.uid ? (lastMsg.uid === userData.uid) : (lastMsg.author === userData.realName);
-               if (!isMyMessage) {
-                   updateDoc(doc(db, "userChats", userData.uid), { [`${roomId}.unread`]: false }).catch(()=>{});
-                   if(document.visibilityState === "hidden") notificationAudio.current.play().catch(()=>{}); 
+               
+               // 🎵 SOUND FIX: Only play if the Message ID is NEW
+               if (lastMsg.id !== lastMessageIdRef.current) {
+                   lastMessageIdRef.current = lastMsg.id; // Mark as played
+                   
+                   const isMyMessage = lastMsg.uid ? (lastMsg.uid === userData.uid) : (lastMsg.author === userData.realName);
+                   if (!isMyMessage) {
+                       updateDoc(doc(db, "userChats", userData.uid), { [`${roomId}.unread`]: false }).catch(()=>{});
+                       if(document.visibilityState === "hidden") notificationAudio.current.play().catch(()=>{}); 
+                   }
                }
            }
        });
 
-       // 📞 LISTEN FOR INCOMING CALLS
+       // Call listeners (kept same)
        socket.off("callUser"); 
        socket.on("callUser", (data) => {
-           // 🛡️ BLOCK SELF-CALLS
            if (data.from === userData.uid) return;
-
-           // 🆕 SAVE CALLER INFO FOR UI
-           // data.name and data.from are sent from the server. 
-           // We might want to fetch their photo if not sent, but for now lets use what we have or 'otherUser' as fallback
            setIncomingCaller({
                realName: data.name,
                uid: data.from,
-               // If data doesn't have photo, we assume it's the person in this chat (safe assumption for DM)
                photoURL: (data.from === otherUid) ? otherUser?.photoURL : "https://cdn-icons-png.flaticon.com/512/149/149071.png"
            });
-
            setCallStatus("incoming");
            setCallerSignal(data.signal);
            ringtoneAudio.current.loop = true;
@@ -171,7 +166,20 @@ function PersonalChat({ userData, socket }) {
            socket.off("callEnded");
        };
     }
-  }, [roomId, userData, otherUser]); // Added otherUser dependency to update photo correctly
+  }, [roomId, userData, otherUser]);
+
+  // 📜 SMART AUTO-SCROLL FIX
+  useLayoutEffect(() => {
+      const container = scrollContainerRef.current;
+      if (container) {
+          // Logic: Only auto-scroll if user is already near bottom OR it's the very first load
+          const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+          
+          if (isNearBottom || messageList.length < 10) {
+              bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+          }
+      }
+  }, [messageList, typingUser]);
 
   const forceAudioPlay = () => {
       if(userAudio.current) {
@@ -199,7 +207,6 @@ function PersonalChat({ userData, socket }) {
                   name: userData.realName 
               });
           } else {
-              // Answer sending back to the caller stored in incomingCaller
               const targetId = incomingCaller?.uid || otherUid;
               socket.emit("answerCall", { signal: data, to: targetId }); 
           }
@@ -237,7 +244,7 @@ function PersonalChat({ userData, socket }) {
 
   const leaveCall = () => {
       setCallStatus("idle");
-      setIncomingCaller(null); // Clear caller info
+      setIncomingCaller(null);
       ringtoneAudio.current.pause();
       if (connectionRef.current) connectionRef.current.destroy();
       
@@ -248,7 +255,6 @@ function PersonalChat({ userData, socket }) {
       window.location.reload(); 
   };
 
-  // ... (Keep handleFileSelect, sendMessage, handleTyping) ...
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -289,8 +295,6 @@ function PersonalChat({ userData, socket }) {
     socket.on("hide_typing", () => setTypingUser(""));
     return () => { socket.off("display_typing"); socket.off("hide_typing"); };
   }, [socket]);
-  
-  useEffect(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), [messageList, typingUser]);
 
   if (!userData) return <div className="h-screen bg-black flex items-center justify-center text-white">Loading...</div>;
 
@@ -315,8 +319,8 @@ function PersonalChat({ userData, socket }) {
             </button>
         </div>
 
-        {/* MESSAGES */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 pb-24 custom-scrollbar">
+        {/* MESSAGES - Attached ref to container for scroll logic */}
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-2 pb-24 custom-scrollbar">
             {messageList.map((msg, idx) => {
                 const isMe = msg.uid ? (msg.uid === userData.uid) : (msg.author === userData.realName);
                 return (
@@ -350,18 +354,16 @@ function PersonalChat({ userData, socket }) {
             <button onClick={() => sendMessage()} className="bg-blue-600 w-12 h-12 rounded-full text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform hover:bg-blue-500"><span className="-ml-0.5 text-lg">➤</span></button>
         </div>
 
-        {/* 📞 CALL MODAL */}
         <CallModal 
             callStatus={callStatus} 
             otherUser={otherUser} 
-            incomingCaller={incomingCaller} // 🎯 PASSED CORRECT DATA
+            incomingCaller={incomingCaller} 
             onAnswer={answerCall} 
             onReject={leaveCall} 
             onEnd={leaveCall} 
             onForceAudio={forceAudioPlay} 
         />
         
-        {/* 🔈 REMOTE AUDIO */}
         <audio ref={userAudio} autoPlay playsInline controls={false} />
 
         <style>{`
