@@ -2,7 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import EmojiPicker from "emoji-picker-react";
 import { db } from "../firebase";
-import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "firebase/firestore";
+import { 
+  collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, 
+  deleteDoc, doc 
+} from "firebase/firestore";
 
 // 🎵 SOUND EFFECT
 const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3";
@@ -51,7 +54,7 @@ function GroupChat({ userData, socket }) {
   const [systemMessages, setSystemMessages] = useState([]); 
   const [userList, setUserList] = useState([]);
   const [showEmoji, setShowEmoji] = useState(false);
-  const [showMembers, setShowMembers] = useState(false); // 📱 State for Mobile Modal
+  const [showMembers, setShowMembers] = useState(false); 
   
   const notificationAudio = useRef(new Audio(NOTIFICATION_SOUND));
   const bottomRef = useRef(null);
@@ -100,6 +103,19 @@ function GroupChat({ userData, socket }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [combinedMessages]);
 
+  // 🗑️ CLEAR CHAT FUNCTION
+  const clearChat = async () => {
+      if (confirm("⚠️ Are you sure you want to delete ALL messages in this room? This cannot be undone.")) {
+          // Loop through and delete from Firestore
+          messageList.forEach(async (msg) => {
+              if (msg.id) {
+                  await deleteDoc(doc(db, "chats", roomId, "messages", msg.id));
+              }
+          });
+          setSystemMessages([]); // Clear local system messages
+      }
+  };
+
   const sendMessage = async () => {
     if (currentMessage.trim() !== "") {
       const messageData = {
@@ -121,10 +137,9 @@ function GroupChat({ userData, socket }) {
   let lastDate = null;
 
   return (
-    // ✅ FIXED LAYOUT FOR MOBILE (Same as PersonalChat)
     <div className="fixed inset-0 bg-[#0b0f19] flex font-sans overflow-hidden">
       
-      {/* 🛑 SIDEBAR (DESKTOP ONLY) */}
+      {/* 🛑 SIDEBAR (DESKTOP) */}
       <div className="hidden md:flex flex-col w-[300px] h-full bg-black/20 backdrop-blur-xl border-r border-white/5 z-20">
            <div className="p-6 border-b border-white/5 bg-white/5 backdrop-blur-md">
              <h2 className="font-bold text-white text-lg">Room: {roomId}</h2>
@@ -151,7 +166,6 @@ function GroupChat({ userData, socket }) {
             <div className="flex items-center gap-4">
                 <button onClick={() => navigate("/")} className="md:hidden text-gray-400 hover:text-white transition p-2">←</button>
                 
-                {/* 📱 CLICKABLE HEADER FOR MOBILE MEMBERS */}
                 <div className="flex items-center gap-3 cursor-pointer" onClick={() => setShowMembers(true)}>
                     <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg">#</div>
                     <div>
@@ -160,6 +174,11 @@ function GroupChat({ userData, socket }) {
                     </div>
                 </div>
             </div>
+
+            {/* 🗑️ CLEAR BUTTON */}
+            <button onClick={clearChat} className="text-xs px-3 py-2 rounded-lg bg-red-900/20 text-red-400 border border-red-500/20 hover:bg-red-900/40 transition">
+                Clear Chat
+            </button>
         </div>
 
         {/* MESSAGES LIST */}
@@ -212,7 +231,7 @@ function GroupChat({ userData, socket }) {
             <div ref={bottomRef} />
         </div>
 
-        {/* INPUT AREA - Fixed to bottom */}
+        {/* INPUT AREA */}
         <div className="fixed bottom-0 left-0 w-full md:relative bg-[#0b0f19] md:bg-black/60 backdrop-blur-2xl border-t border-white/10 p-3 shrink-0 z-30 flex items-center gap-2 pb-safe">
             
             {showEmoji && <div className="absolute bottom-20 left-4 z-50"><EmojiPicker onEmojiClick={(e)=>setCurrentMessage(prev=>prev+e.emoji)} theme="dark" height={350}/></div>}
@@ -230,7 +249,6 @@ function GroupChat({ userData, socket }) {
         </div>
       </div>
 
-      {/* MOBILE MEMBERS MODAL */}
       {showMembers && <MembersModal users={userList} onClose={() => setShowMembers(false)} />}
       
       <style>{`
@@ -238,6 +256,7 @@ function GroupChat({ userData, socket }) {
         @keyframes fade-in-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in-up { animation: fade-in-up 0.3s ease-out forwards; }
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-track { bg: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
       `}</style>
     </div>
