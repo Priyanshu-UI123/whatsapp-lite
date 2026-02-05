@@ -75,7 +75,10 @@ function PersonalChat({ userData, socket }) {
            
            if (msgs.length > 0) {
                const lastMsg = msgs[msgs.length - 1];
-               if (lastMsg.author !== userData.realName) {
+               // Check using UID if available, fallback to author name
+               const isMyMessage = lastMsg.uid ? (lastMsg.uid === userData.uid) : (lastMsg.author === userData.realName);
+               
+               if (!isMyMessage) {
                    updateDoc(doc(db, "userChats", userData.uid), { [`${roomId}.unread`]: false }).catch(()=>{});
                    notificationAudio.current.play().catch(()=>{}); 
                }
@@ -118,6 +121,7 @@ function PersonalChat({ userData, socket }) {
     const messageData = {
         room: roomId,
         author: userData.realName,
+        uid: userData.uid, // 🛡️ CRITICAL FIX: Save UID for reliable alignment
         photo: userData.photoURL,
         message: type === "text" ? content : "📷 Image", // Fallback text for sidebar
         image: type === "image" ? content : null,        // Store Base64 here
@@ -182,7 +186,9 @@ function PersonalChat({ userData, socket }) {
         {/* MESSAGES */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2 pb-24 custom-scrollbar">
             {messageList.map((msg, idx) => {
-                const isMe = msg.author === userData.realName;
+                // 🛡️ FIX: Check UID first, fallback to name for old messages
+                const isMe = msg.uid ? (msg.uid === userData.uid) : (msg.author === userData.realName);
+                
                 return (
                     <div key={idx} className={`flex w-full ${isMe ? "justify-end" : "justify-start"}`}>
                         <div className={`max-w-[75%] px-4 py-2 rounded-2xl text-sm ${isMe ? "bg-blue-600 text-white rounded-br-none" : "bg-white/10 text-gray-200 rounded-bl-none"}`}>
