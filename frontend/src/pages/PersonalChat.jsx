@@ -12,14 +12,61 @@ import {
 const NOTIFICATION_SOUND = "https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3";
 const RINGTONE_SOUND = "https://assets.mixkit.co/active_storage/sfx/1359/1359-preview.mp3";
 
-// 📞 CALL MODAL
-const CallModal = ({ callStatus, otherUser, incomingCaller, onAnswer, onReject, onEnd, onForceAudio }) => {
-    if (callStatus === "idle") return null;
+// 🎥 VIDEO CALL COMPONENT (Handles the Full Screen Video UI)
+const VideoCallScreen = ({ localStream, remoteStream, onEnd, toggleMic, toggleVideo, isMicOn, isVideoOn }) => {
+    const myVideo = useRef();
+    const userVideo = useRef();
 
-    // 🎯 CRITICAL FIX: If we have an incoming caller data, STICK WITH IT.
-    // Even if status changes to "connected", we want to see the person who called us.
+    useEffect(() => {
+        if (myVideo.current && localStream) myVideo.current.srcObject = localStream;
+    }, [localStream]);
+
+    useEffect(() => {
+        if (userVideo.current && remoteStream) userVideo.current.srcObject = remoteStream;
+    }, [remoteStream]);
+
+    return (
+        <div className="fixed inset-0 z-[200] bg-black flex flex-col items-center justify-center animate-fade-in">
+            {/* 👤 REMOTE VIDEO (Full Screen) */}
+            <div className="absolute inset-0 w-full h-full">
+                {remoteStream ? (
+                    <video ref={userVideo} autoPlay playsInline className="w-full h-full object-cover transform scale-x-[-1]" />
+                ) : (
+                    <div className="flex items-center justify-center h-full text-white animate-pulse">Connecting Video...</div>
+                )}
+            </div>
+
+            {/* 🏠 LOCAL VIDEO (Picture-in-Picture) */}
+            <div className="absolute bottom-24 right-4 w-32 h-48 md:w-48 md:h-64 bg-gray-900 rounded-2xl overflow-hidden border-2 border-white/20 shadow-2xl z-10">
+                <video ref={myVideo} autoPlay playsInline muted className={`w-full h-full object-cover transform scale-x-[-1] ${!isVideoOn ? 'hidden' : ''}`} />
+                {!isVideoOn && <div className="absolute inset-0 flex items-center justify-center text-2xl">🚫</div>}
+            </div>
+
+            {/* 🎛️ CONTROLS BAR */}
+            <div className="absolute bottom-6 flex items-center gap-6 p-4 bg-black/40 backdrop-blur-md rounded-full border border-white/10 z-20">
+                <button onClick={toggleMic} className={`p-4 rounded-full transition ${isMicOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500/80 text-white'}`}>
+                    {isMicOn ? "🎤" : "🔇"}
+                </button>
+                
+                <button onClick={onEnd} className="p-4 bg-red-600 rounded-full hover:bg-red-500 transition shadow-lg transform hover:scale-110">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24" strokeWidth={0} stroke="currentColor" className="w-6 h-6">
+                        <path d="M20.25 6.75l-2.25-2.25-6 6-6-6-2.25 2.25 6 6-6 6 2.25 2.25 6-6 6 6 2.25-2.25-6-6 6-6z" /> 
+                    </svg>
+                </button>
+
+                <button onClick={toggleVideo} className={`p-4 rounded-full transition ${isVideoOn ? 'bg-white/10 hover:bg-white/20' : 'bg-red-500/80 text-white'}`}>
+                    {isVideoOn ? "📹" : "🚫"}
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// 📞 CALL MODAL (Incoming/Dialing State Only)
+const CallModal = ({ callStatus, otherUser, incomingCaller, onAnswer, onReject }) => {
+    if (callStatus === "idle" || callStatus === "connected") return null; // Connected is now handled by VideoCallScreen
+
     const displayUser = incomingCaller || otherUser;
-    
     const displayName = displayUser?.realName || displayUser?.name || "Unknown User";
     const displayPhoto = displayUser?.photoURL || displayUser?.photo || "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
@@ -34,27 +81,17 @@ const CallModal = ({ callStatus, otherUser, incomingCaller, onAnswer, onReject, 
                 <h2 className="text-2xl font-bold text-white mt-2">{displayName}</h2>
                 <p className="text-blue-400 font-mono tracking-widest uppercase text-xs animate-pulse">
                     {callStatus === "calling" && "Dialing..."}
-                    {callStatus === "incoming" && "Incoming Call..."}
-                    {callStatus === "connected" && "Connected"}
+                    {callStatus === "incoming" && "Incoming Video Call..."}
                 </p>
 
-                {callStatus === "connected" && (
-                     <button onClick={onForceAudio} className="w-full bg-blue-600/20 text-blue-400 border border-blue-500/50 py-2 rounded-xl font-bold text-xs hover:bg-blue-600 hover:text-white transition">
-                         🔊 Tap here if no sound
-                     </button>
-                )}
-
-                <div className="flex items-center gap-8 mt-2">
+                <div className="flex items-center gap-8 mt-4">
                     {callStatus === "incoming" && (
                         <button onClick={onAnswer} className="w-16 h-16 shrink-0 bg-green-500 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition animate-bounce">
-                            <span className="text-2xl">📞</span>
+                            <span className="text-2xl">📹</span>
                         </button>
                     )}
-                    <button onClick={callStatus === "incoming" ? onReject : onEnd} 
-                        className="w-16 h-16 shrink-0 bg-red-500 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition hover:bg-red-600">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24" strokeWidth={0} stroke="currentColor" className="w-8 h-8">
-                            <path d="M20.25 6.75l-2.25-2.25-6 6-6-6-2.25 2.25 6 6-6 6 2.25 2.25 6-6 6 6 2.25-2.25-6-6 6-6z" /> 
-                        </svg>
+                    <button onClick={onReject} className="w-16 h-16 shrink-0 bg-red-500 rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition hover:bg-red-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24" strokeWidth={0} stroke="currentColor" className="w-8 h-8"><path d="M20.25 6.75l-2.25-2.25-6 6-6-6-2.25 2.25 6 6-6 6 2.25 2.25 6-6 6 6 2.25-2.25-6-6 6-6z" /></svg>
                     </button>
                 </div>
             </div>
@@ -62,6 +99,7 @@ const CallModal = ({ callStatus, otherUser, incomingCaller, onAnswer, onReject, 
     );
 };
 
+// ... MessageStatus & TypingIndicator (Keep same) ...
 const MessageStatus = ({ status, isMyMessage }) => {
   if (!isMyMessage) return null;
   if (status === "sent") return <span className="text-white/40 text-[10px] ml-1">✓</span>;
@@ -92,9 +130,14 @@ function PersonalChat({ userData, socket }) {
   const [callerSignal, setCallerSignal] = useState(null);
   const [incomingCaller, setIncomingCaller] = useState(null);
   
+  // 🎥 VIDEO STATES
+  const [localStream, setLocalStream] = useState(null);
+  const [remoteStream, setRemoteStream] = useState(null);
+  const [isMicOn, setIsMicOn] = useState(true);
+  const [isVideoOn, setIsVideoOn] = useState(true);
+
   const notificationAudio = useRef(new Audio(NOTIFICATION_SOUND));
   const ringtoneAudio = useRef(new Audio(RINGTONE_SOUND));
-  const userAudio = useRef(); 
   const connectionRef = useRef();
   
   // 🛠️ REFS
@@ -104,8 +147,6 @@ function PersonalChat({ userData, socket }) {
   const typingTimeoutRef = useRef(null);
   const fileInputRef = useRef(null);
   const prevMessageListLength = useRef(0);
-  
-  // 🛑 INITIAL LOAD GUARD
   const isInitialLoad = useRef(true); 
 
   useEffect(() => {
@@ -116,9 +157,7 @@ function PersonalChat({ userData, socket }) {
        const ids = roomId.split("_");
        const otherUid = ids[0] === userData.uid ? ids[1] : ids[0];
        
-       getDoc(doc(db, "users", otherUid)).then(snap => {
-           if(snap.exists()) setOtherUser(snap.data());
-       });
+       getDoc(doc(db, "users", otherUid)).then(snap => { if(snap.exists()) setOtherUser(snap.data()); });
 
        const q = query(collection(db, "chats", roomId, "messages"), orderBy("createdAt", "asc"));
        const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -126,9 +165,7 @@ function PersonalChat({ userData, socket }) {
            setMessageList(msgs);
            
            if (isInitialLoad.current) {
-               if(msgs.length > 0) {
-                   lastMessageIdRef.current = msgs[msgs.length - 1].id;
-               }
+               if(msgs.length > 0) lastMessageIdRef.current = msgs[msgs.length - 1].id;
                isInitialLoad.current = false;
                return; 
            }
@@ -140,9 +177,7 @@ function PersonalChat({ userData, socket }) {
                    const isMyMessage = lastMsg.uid ? (lastMsg.uid === userData.uid) : (lastMsg.author === userData.realName);
                    if (!isMyMessage) {
                        updateDoc(doc(db, "userChats", userData.uid), { [`${roomId}.unread`]: false }).catch(()=>{});
-                       if(document.visibilityState === "hidden") {
-                           notificationAudio.current.play().catch(()=>{}); 
-                       }
+                       if(document.visibilityState === "hidden") notificationAudio.current.play().catch(()=>{}); 
                    }
                }
            }
@@ -151,21 +186,8 @@ function PersonalChat({ userData, socket }) {
        socket.off("callUser"); 
        socket.on("callUser", (data) => {
            if (data.from === userData.uid) return;
-           
-           // ✅ Ensure we capture the caller's photo correctly
-           // If they called me, I want THEIR photo. 
-           // If I am chatting with 'otherUser' and THEY called, use otherUser.photo.
-           // If a random person called, use default.
-           const callerPhoto = (data.from === otherUid && otherUser?.photoURL) 
-                ? otherUser.photoURL 
-                : "https://cdn-icons-png.flaticon.com/512/149/149071.png";
-
-           setIncomingCaller({
-               realName: data.name,
-               uid: data.from,
-               photoURL: callerPhoto
-           });
-           
+           const callerPhoto = (data.from === otherUid && otherUser?.photoURL) ? otherUser.photoURL : "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+           setIncomingCaller({ realName: data.name, uid: data.from, photoURL: callerPhoto });
            setCallStatus("incoming");
            setCallerSignal(data.signal);
            ringtoneAudio.current.loop = true;
@@ -188,27 +210,17 @@ function PersonalChat({ userData, socket }) {
            socket.off("callEnded");
        };
     }
-  }, [roomId, userData, otherUser]); // otherUser dependency ensures we have the photo ready
+  }, [roomId, userData, otherUser]);
 
   useLayoutEffect(() => {
       const container = scrollContainerRef.current;
       const currentLength = messageList.length;
-      const prevLength = prevMessageListLength.current;
-
-      if (container && currentLength > prevLength) {
+      if (container && currentLength > prevMessageListLength.current) {
           const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
-          if (prevLength === 0 || isNearBottom) {
-              bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-          }
+          if (prevMessageListLength.current === 0 || isNearBottom) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
       }
       prevMessageListLength.current = currentLength;
   }, [messageList]);
-
-  const forceAudioPlay = () => {
-      if(userAudio.current) {
-          userAudio.current.play().catch(e => console.log("Force Play Error:", e));
-      }
-  };
 
   const createPeer = (initiator, stream) => {
       const peer = new Peer({ 
@@ -221,25 +233,16 @@ function PersonalChat({ userData, socket }) {
       peer.on("signal", (data) => {
           const ids = roomId.split("_");
           const otherUid = ids[0] === userData.uid ? ids[1] : ids[0];
-
           if(initiator) {
-              socket.emit("callUser", { 
-                  userToCall: otherUid, 
-                  signalData: data, 
-                  from: userData.uid, 
-                  name: userData.realName 
-              });
+              socket.emit("callUser", { userToCall: otherUid, signalData: data, from: userData.uid, name: userData.realName });
           } else {
               const targetId = incomingCaller?.uid || otherUid;
               socket.emit("answerCall", { signal: data, to: targetId }); 
           }
       });
 
-      peer.on("stream", (remoteStream) => {
-          if (userAudio.current) {
-              userAudio.current.srcObject = remoteStream;
-              userAudio.current.play().catch(e => console.log("Autoplay blocked"));
-          }
+      peer.on("stream", (stream) => {
+          setRemoteStream(stream); // 🎥 Save remote stream for video
       });
 
       return peer;
@@ -247,10 +250,12 @@ function PersonalChat({ userData, socket }) {
 
   const callUser = () => {
       setCallStatus("calling");
-      navigator.mediaDevices.getUserMedia({ video: false, audio: true }).then((stream) => {
+      // 🎥 REQUEST VIDEO & AUDIO
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
+          setLocalStream(stream);
           connectionRef.current = createPeer(true, stream);
       }).catch(err => {
-          alert("Check Mic Permissions");
+          alert("Camera/Mic Error: " + err.message);
           setCallStatus("idle");
       });
   };
@@ -258,7 +263,9 @@ function PersonalChat({ userData, socket }) {
   const answerCall = () => {
       setCallStatus("connected");
       ringtoneAudio.current.pause();
-      navigator.mediaDevices.getUserMedia({ video: false, audio: true }).then((stream) => {
+      // 🎥 REQUEST VIDEO & AUDIO
+      navigator.mediaDevices.getUserMedia({ video: true, audio: true }).then((stream) => {
+          setLocalStream(stream);
           const peer = createPeer(false, stream);
           peer.signal(callerSignal);
           connectionRef.current = peer;
@@ -268,17 +275,42 @@ function PersonalChat({ userData, socket }) {
   const leaveCall = () => {
       setCallStatus("idle");
       setIncomingCaller(null);
+      setLocalStream(null);
+      setRemoteStream(null);
       ringtoneAudio.current.pause();
       if (connectionRef.current) connectionRef.current.destroy();
       
+      // Stop all camera tracks
+      if (localStream) localStream.getTracks().forEach(track => track.stop());
+
       const ids = roomId.split("_");
       const otherUid = ids[0] === userData.uid ? ids[1] : ids[0];
-      
-      // Attempt to end for both: Caller or Chat Partner
       socket.emit("endCall", { to: incomingCaller?.uid || otherUid }); 
       window.location.reload(); 
   };
 
+  // 🎛️ CONTROLS
+  const toggleMic = () => {
+      if (localStream) {
+          const audioTrack = localStream.getAudioTracks()[0];
+          if (audioTrack) {
+              audioTrack.enabled = !audioTrack.enabled;
+              setIsMicOn(audioTrack.enabled);
+          }
+      }
+  };
+
+  const toggleVideo = () => {
+      if (localStream) {
+          const videoTrack = localStream.getVideoTracks()[0];
+          if (videoTrack) {
+              videoTrack.enabled = !videoTrack.enabled;
+              setIsVideoOn(videoTrack.enabled);
+          }
+      }
+  };
+
+  // ... (Keep handleFileSelect, sendMessage, handleTyping) ...
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -305,7 +337,6 @@ function PersonalChat({ userData, socket }) {
     if (type === "text") setCurrentMessage("");
     setShowEmoji(false);
     socket.emit("stop_typing", roomId);
-    
     setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
   };
 
@@ -340,8 +371,11 @@ function PersonalChat({ userData, socket }) {
                 </div>
             </div>
             
+            {/* 📹 VIDEO CALL BUTTON */}
             <button onClick={callUser} className="p-3 rounded-full bg-green-500/20 text-green-400 hover:bg-green-500 hover:text-white transition">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" /></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                  <path strokeLinecap="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+                </svg>
             </button>
         </div>
 
@@ -380,17 +414,29 @@ function PersonalChat({ userData, socket }) {
             <button onClick={() => sendMessage()} className="bg-blue-600 w-12 h-12 rounded-full text-white flex items-center justify-center shadow-lg active:scale-95 transition-transform hover:bg-blue-500"><span className="-ml-0.5 text-lg">➤</span></button>
         </div>
 
+        {/* 📞 CALL OVERLAYS */}
+        
+        {/* 1. INCOMING / DIALING SCREEN */}
         <CallModal 
             callStatus={callStatus} 
             otherUser={otherUser} 
             incomingCaller={incomingCaller} 
             onAnswer={answerCall} 
             onReject={leaveCall} 
-            onEnd={leaveCall} 
-            onForceAudio={forceAudioPlay} 
         />
         
-        <audio ref={userAudio} autoPlay playsInline controls={false} />
+        {/* 2. ACTIVE VIDEO CALL SCREEN */}
+        {callStatus === "connected" && (
+            <VideoCallScreen 
+                localStream={localStream} 
+                remoteStream={remoteStream} 
+                onEnd={leaveCall}
+                toggleMic={toggleMic}
+                toggleVideo={toggleVideo}
+                isMicOn={isMicOn}
+                isVideoOn={isVideoOn}
+            />
+        )}
 
         <style>{`
             .pb-safe { padding-bottom: env(safe-area-inset-bottom); } 
