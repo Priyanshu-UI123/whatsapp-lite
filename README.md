@@ -18,6 +18,6 @@ A real-time chat app with a premium glassmorphism design, built with **React** a
 ```bash
 npm install
 npm run dev
-
-👨‍💻 Author
+```
+### 👨‍💻 Author
 Priyansu Dash 📧 pupuhari123@gmail.com
